@@ -1,18 +1,18 @@
-"""In-memory data store.
+"""Data store — SQLAlchemy-backed.
 
-This is a temporary stand-in for a real database. Every method here is what a
-Postgres-backed repository would also expose, so swapping this out later means
-reimplementing this one file (e.g. with SQLAlchemy) without touching callers.
+Same interface the code has always used (`repository.users`, `repository.runs`,
+`repository.new_id`), now persisted to a real database. Each record is stored as
+its JSON payload with the queried columns promoted; see app/db.py.
 
-NOT for production: data lives in process memory and is lost on restart, and it
-is not safe across multiple worker processes.
+Switching between SQLite and Postgres is just the DATABASE_URL setting — nothing
+in this file changes.
 """
 
 from __future__ import annotations
 
-import threading
 import uuid
 
+from app.db import RunRow, SessionLocal, UserRow
 from app.models.schemas import Run, User
 
 
@@ -21,55 +21,65 @@ def new_id() -> str:
 
 
 class UserRepository:
-    def __init__(self) -> None:
-        self._by_id: dict[str, User] = {}
-        self._by_email: dict[str, str] = {}  # email -> id
-        self._lock = threading.Lock()
-
     def create(self, user: User) -> User:
-        with self._lock:
-            if user.email in self._by_email:
+        with SessionLocal() as s:
+            exists = s.query(UserRow).filter(UserRow.email == user.email).first()
+            if exists:
                 raise ValueError("A user with that email already exists.")
-            self._by_id[user.id] = user
-            self._by_email[user.email] = user.id
-            return user
+            s.add(UserRow(id=user.id, email=user.email, data=user.model_dump_json()))
+            s.commit()
+        return user
 
     def get(self, user_id: str) -> User | None:
-        return self._by_id.get(user_id)
+        with SessionLocal() as s:
+            row = s.get(UserRow, user_id)
+            return User.model_validate_json(row.data) if row else None
 
     def get_by_email(self, email: str) -> User | None:
-        uid = self._by_email.get(email)
-        return self._by_id.get(uid) if uid else None
+        with SessionLocal() as s:
+            row = s.query(UserRow).filter(UserRow.email == email).first()
+            return User.model_validate_json(row.data) if row else None
 
     def save(self, user: User) -> User:
-        with self._lock:
-            self._by_id[user.id] = user
-            return user
+        with SessionLocal() as s:
+            row = s.get(UserRow, user.id)
+            if row:
+                row.email = user.email
+                row.data = user.model_dump_json()
+            else:
+                s.add(UserRow(id=user.id, email=user.email, data=user.model_dump_json()))
+            s.commit()
+        return user
 
 
 class RunRepository:
-    def __init__(self) -> None:
-        self._by_id: dict[str, Run] = {}
-        self._lock = threading.Lock()
-
     def create(self, run: Run) -> Run:
-        with self._lock:
-            self._by_id[run.id] = run
-            return run
+        with SessionLocal() as s:
+            s.add(RunRow(id=run.id, user_id=run.user_id, data=run.model_dump_json()))
+            s.commit()
+        return run
 
     def get(self, run_id: str) -> Run | None:
-        return self._by_id.get(run_id)
+        with SessionLocal() as s:
+            row = s.get(RunRow, run_id)
+            return Run.model_validate_json(row.data) if row else None
 
     def save(self, run: Run) -> Run:
-        with self._lock:
-            self._by_id[run.id] = run
-            return run
+        with SessionLocal() as s:
+            row = s.get(RunRow, run.id)
+            if row:
+                row.data = run.model_dump_json()
+            else:
+                s.add(RunRow(id=run.id, user_id=run.user_id, data=run.model_dump_json()))
+            s.commit()
+        return run
 
     def list_for_user(self, user_id: str) -> list[Run]:
-        return [r for r in self._by_id.values() if r.user_id == user_id]
+        with SessionLocal() as s:
+            rows = s.query(RunRow).filter(RunRow.user_id == user_id).all()
+            return [Run.model_validate_json(r.data) for r in rows]
 
 
-# Module-level singletons used across the app. Replacing these with a DB-backed
-# implementation is the only change needed to persist data.
+# Module-level singletons used across the app.
 users = UserRepository()
 runs = RunRepository()

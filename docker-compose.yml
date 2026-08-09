@@ -1,0 +1,48 @@
+# Local full-stack: API + Postgres.
+#
+# The analysis sandbox image is built separately and run per-request by the API,
+# so it is not a long-running service here:
+#   docker build -f docker/Dockerfile.sandbox -t research-assistant-sandbox:latest .
+#
+# Start:  docker compose up --build
+# The API needs access to the Docker daemon to launch sandbox containers, hence
+# the docker socket mount. Review that trade-off before using in production.
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: research
+      POSTGRES_PASSWORD: research
+      POSTGRES_DB: research_assistant
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U research"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://research:research@db:5432/research_assistant
+      MOONSHOT_API_KEY: ${MOONSHOT_API_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      EASYKASH_API_KEY: ${EASYKASH_API_KEY:-}
+      EASYKASH_WEBHOOK_SECRET: ${EASYKASH_WEBHOOK_SECRET:-}
+      SANDBOX_IMAGE: research-assistant-sandbox:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      # Lets the API launch sandbox containers on the host daemon.
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  pgdata:

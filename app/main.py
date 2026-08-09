@@ -9,9 +9,20 @@ webhook):
     -> script -> execute -> results -> download
 """
 
+import logging
+import os
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import auth, health, payments, runs
+from app.config import settings
+from app.db import init_db
+
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 app = FastAPI(
     title="AI Research Assistant",
@@ -20,13 +31,32 @@ app = FastAPI(
         "AI proposes; a human confirms every judgment call; nothing is "
         "treated as fact until the sandbox or a human has verified it."
     ),
-    version="0.2.0",
+    version="1.0.0",
+)
+
+_origins = ["*"] if settings.cors_origins.strip() == "*" else [
+    o.strip() for o in settings.cors_origins.split(",") if o.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(payments.router)
 app.include_router(runs.router)
+
+
+@app.on_event("startup")
+def _startup() -> None:
+    init_db()
+    for sub in ("uploads", "artifacts", "outputs"):
+        os.makedirs(os.path.join(settings.data_dir, sub), exist_ok=True)
+    logging.getLogger("app").info("AI Research Assistant %s started", app.version)
 
 
 @app.get("/")

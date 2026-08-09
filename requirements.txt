@@ -13,6 +13,10 @@ email-validator     # EmailStr validation
 passlib[bcrypt]     # password hashing
 pyjwt               # JWT access tokens
 
+# --- Database ---
+sqlalchemy          # ORM / engine (SQLite by default, Postgres in prod)
+psycopg2-binary     # Postgres driver (only needed when using Postgres)
+
 # --- Data handling ---
 pandas
 openpyxl            # .xlsx reading

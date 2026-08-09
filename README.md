@@ -49,11 +49,21 @@ docker/
 tests/                 Integrity, auth+payment, and full end-to-end pipeline tests
 ```
 
-The pipeline is fully implemented and tested end-to-end. Two deliberate stand-ins
-to finish before production: the **in-memory store** (`store/repository.py`) should
-be replaced by a real database, and the **EasyKash** request/response field names
-and signature scheme in `services/payments.py` should be confirmed against their
-current merchant docs.
+The pipeline is fully implemented and tested end-to-end, with a SQLAlchemy database
+(SQLite by default, Postgres in production via `DATABASE_URL`). One integration
+detail to confirm before going live: the **EasyKash** request/response field names
+and signature scheme in `services/payments.py`, against their current merchant docs.
+
+### Run with Docker
+
+```bash
+# 1) build the analysis sandbox image (used per-run)
+docker build -f docker/Dockerfile.sandbox -t research-assistant-sandbox:latest .
+# 2) bring up API + Postgres
+MOONSHOT_API_KEY=sk-... docker compose up --build
+```
+
+API on http://localhost:8000 (docs at /docs).
 
 ## API flow
 

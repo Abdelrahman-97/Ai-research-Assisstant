@@ -49,6 +49,13 @@ class Settings(BaseSettings):
     # Storage — where uploads, generated scripts, and artifacts live at runtime.
     data_dir: str = "data"
 
+    # Database. SQLite by default so the app runs with zero setup; point this at
+    # Postgres for production, e.g. postgresql+psycopg2://user:pass@host:5432/db
+    database_url: str = "sqlite:///./data/app.db"
+
+    # CORS — comma-separated list of allowed frontend origins.
+    cors_origins: str = "*"
+
 
 @lru_cache
 def get_settings() -> Settings:
