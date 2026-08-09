@@ -1,0 +1,22 @@
+# Sandbox image for executing generated analysis scripts (Python + R).
+# Built separately from the app; run with no network and a strict timeout.
+#
+#   docker build -f docker/Dockerfile.sandbox -t research-assistant-sandbox:latest .
+
+FROM python:3.11-slim
+
+# R for R-based analyses
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends r-base \
+    && rm -rf /var/lib/apt/lists/*
+
+# Common statistics packages
+RUN pip install --no-cache-dir pandas numpy scipy statsmodels matplotlib
+
+# Non-root user for the sandbox
+RUN useradd -m runner
+USER runner
+WORKDIR /work
+
+# Scripts and data are mounted at runtime; outputs written to /work/artifacts
+CMD ["python", "--version"]

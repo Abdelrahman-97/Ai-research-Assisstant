@@ -1,0 +1,28 @@
+# --- Core web framework ---
+fastapi
+uvicorn[standard]
+
+# --- Config & validation ---
+pydantic
+pydantic-settings
+python-dotenv
+
+# --- Data handling ---
+pandas
+openpyxl            # .xlsx reading
+
+# --- Document export (Markdown -> .docx) ---
+python-docx
+
+# --- AI / LLM ---
+anthropic           # claude_client
+
+# --- Grammar checking (local, no API key) ---
+language-tool-python
+
+# --- Sandbox orchestration ---
+docker              # controls the execution sandbox container
+
+# --- Testing ---
+pytest
+httpx               # test client for FastAPI
