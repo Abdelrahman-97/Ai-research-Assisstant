@@ -1,9 +1,8 @@
-"""Auth + payment-gate tests."""
+"""Auth tests + payment webhook bad-path."""
 
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services import payments
 
 client = TestClient(app)
 
@@ -20,11 +19,21 @@ def test_signup_login_me():
     assert r.status_code == 201
     token = r.json()["access_token"]
     assert r.json()["user"]["scope"] == "thesis"
-    assert r.json()["user"]["has_paid"] is False
+
+    login = client.post(
+        "/auth/login", json={"email": "user1@example.com", "password": "supersecret"}
+    )
+    assert login.status_code == 200
 
     me = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert me.status_code == 200
     assert me.json()["email"] == "user1@example.com"
+
+
+def test_login_wrong_password():
+    _signup("pw@example.com")
+    r = client.post("/auth/login", json={"email": "pw@example.com", "password": "nope12345"})
+    assert r.status_code == 401
 
 
 def test_duplicate_signup_rejected():
@@ -33,33 +42,13 @@ def test_duplicate_signup_rejected():
     assert r.status_code == 409
 
 
-def test_pipeline_requires_payment_then_unlocks():
-    r = _signup("payer@example.com")
-    token = r.json()["access_token"]
-    auth = {"Authorization": f"Bearer {token}"}
-
-    # Blocked before payment.
-    blocked = client.post("/runs", headers=auth)
-    assert blocked.status_code == 402
-
-    # Get a payment link (stub link in dev, but reference is real).
-    link = client.post("/payments/link", headers=auth)
-    assert link.status_code == 200
-    reference = link.json()["reference"]
-
-    # Simulate EasyKash success callback (no webhook secret set in tests).
+def test_bad_payment_callback_rejected():
     cb = client.post(
-        "/payments/callback", json={"reference": reference, "status": "success"}
-    )
-    assert cb.status_code == 200 and cb.json()["unlocked"] is True
-
-    # Now allowed.
-    ok = client.post("/runs", headers=auth)
-    assert ok.status_code == 201
-
-
-def test_bad_callback_rejected():
-    cb = client.post(
-        "/payments/callback", json={"reference": "ra_nope", "status": "failed"}
+        "/payments/callback", json={"reference": "run_nope", "status": "failed"}
     )
     assert cb.status_code == 400
+
+
+def test_unauthenticated_pipeline_blocked():
+    # No token -> rejected before reaching any run logic.
+    assert client.post("/runs").status_code in (401, 403)

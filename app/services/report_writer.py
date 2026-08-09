@@ -1,9 +1,9 @@
-"""Report writer (pipeline step 7: export the Results section to .docx).
+"""Report writer (pipeline step 7: export the Results section to .docx and .pdf).
 
-The AI works in Markdown throughout; conversion to Word happens only here, at
-export. This is a lightweight Markdown-to-docx renderer covering what a Results
-section actually uses: headings, paragraphs, bold/italic, bullet/numbered lists,
-and embedding figure artifacts. It deliberately avoids a heavyweight dependency.
+The AI works in Markdown throughout; conversion happens only here, at export.
+The user can download either format. Both renderers cover what a Results section
+actually uses: headings, paragraphs, bold/italic, bullet/numbered lists, and
+embedded figure artifacts.
 """
 
 from __future__ import annotations
@@ -13,6 +13,11 @@ from pathlib import Path
 
 from docx import Document
 from docx.shared import Inches
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import inch
+from reportlab.platypus import Image as RLImage
+from reportlab.platypus import ListFlowable, ListItem, Paragraph, SimpleDocTemplate, Spacer
 
 from app.models.schemas import Artifact
 
@@ -88,4 +93,76 @@ def markdown_to_docx(
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(out))
+    return out
+
+
+def _md_inline_to_html(text: str) -> str:
+    """Convert **bold** / *italic* / _italic_ to the minimal HTML reportlab accepts."""
+    text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
+    text = re.sub(r"(?<!\*)\*(?!\*)(.+?)\*(?!\*)", r"<i>\1</i>", text)
+    text = re.sub(r"_(.+?)_", r"<i>\1</i>", text)
+    return text
+
+
+def markdown_to_pdf(
+    markdown: str,
+    artifacts: list[Artifact],
+    out_path: str | Path,
+) -> Path:
+    """Convert a Markdown Results section + figure artifacts into a .pdf file."""
+    out = Path(out_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    styles = getSampleStyleSheet()
+    story: list = []
+    bullets: list = []
+
+    def flush_bullets() -> None:
+        if bullets:
+            story.append(ListFlowable(list(bullets), bulletType="bullet"))
+            bullets.clear()
+
+    for raw in markdown.splitlines():
+        line = raw.rstrip()
+        if not line:
+            flush_bullets()
+            story.append(Spacer(1, 6))
+            continue
+
+        heading = _HEADING_RE.match(line)
+        if heading:
+            flush_bullets()
+            level = min(len(heading.group(1)), 4)
+            story.append(Paragraph(_md_inline_to_html(heading.group(2)), styles[f"Heading{level}"]))
+            continue
+
+        bullet = _BULLET_RE.match(line)
+        if bullet:
+            bullets.append(ListItem(Paragraph(_md_inline_to_html(bullet.group(1)), styles["BodyText"])))
+            continue
+
+        numbered = _NUMBERED_RE.match(line)
+        if numbered:
+            flush_bullets()
+            story.append(Paragraph(_md_inline_to_html(numbered.group(1)), styles["BodyText"]))
+            continue
+
+        flush_bullets()
+        story.append(Paragraph(_md_inline_to_html(line), styles["BodyText"]))
+
+    flush_bullets()
+
+    figures = [a for a in artifacts if a.kind == "figure" and Path(a.path).exists()]
+    if figures:
+        story.append(Spacer(1, 12))
+        story.append(Paragraph("Figures", styles["Heading2"]))
+        for fig in figures:
+            try:
+                story.append(RLImage(fig.path, width=6 * inch, height=4 * inch, kind="proportional"))
+            except Exception:  # noqa: BLE001 - skip unreadable images
+                continue
+            if fig.caption:
+                story.append(Paragraph(f"<i>{fig.caption}</i>", styles["BodyText"]))
+
+    SimpleDocTemplate(str(out), pagesize=A4).build(story)
     return out

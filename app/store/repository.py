@@ -79,6 +79,10 @@ class RunRepository:
             rows = s.query(RunRow).filter(RunRow.user_id == user_id).all()
             return [Run.model_validate_json(r.data) for r in rows]
 
+    def all(self) -> list[Run]:
+        with SessionLocal() as s:
+            return [Run.model_validate_json(r.data) for r in s.query(RunRow).all()]
+
 
 # Module-level singletons used across the app.
 users = UserRepository()

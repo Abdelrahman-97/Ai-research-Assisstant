@@ -43,8 +43,16 @@ class Settings(BaseSettings):
     easykash_api_key: str = ""
     easykash_webhook_secret: str = ""
     easykash_base_url: str = "https://back.easykash.net/api/v1"
-    # Price shown on the payment link, in EGP.
-    price_egp: int = 1000
+
+    # --- Pricing (all EGP). Tunable — change these to reprice without code edits. ---
+    price_base_thesis_egp: int = 1500     # base price for a thesis results chapter
+    price_base_paper_egp: int = 800       # base price for a paper's results section
+    price_per_test_egp: int = 300         # per estimated statistical test
+    price_per_1000_words_egp: int = 100   # per 1000 words of Results text
+    price_per_1000_cells_egp: int = 20    # per 1000 data cells (rows x cols)
+
+    # Storage retention: inputs + outputs kept this many days after acceptance.
+    retention_days: int = 30
 
     # Storage — where uploads, generated scripts, and artifacts live at runtime.
     data_dir: str = "data"

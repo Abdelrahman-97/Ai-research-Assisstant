@@ -44,14 +44,17 @@ class Scope(str, Enum):
 class RunStatus(str, Enum):
     created = "created"                       # run exists, nothing uploaded yet
     uploaded = "uploaded"                     # data + protocol uploaded
-    plan_proposed = "plan_proposed"           # AI proposed a plan
+    awaiting_payment = "awaiting_payment"     # price estimated, waiting to be paid
+    paid = "paid"                             # payment confirmed; analysis unlocked
     awaiting_approval = "awaiting_approval"   # waiting for the human checkpoint
     approved = "approved"                     # plan approved (or edited + approved)
     script_ready = "script_ready"             # script generated (preview available)
     executing = "executing"
     executed = "executed"                     # artifacts collected
     writing = "writing"
-    completed = "completed"                   # Results section + .docx ready
+    completed = "completed"                   # Results section + document(s) ready
+    accepted = "accepted"                     # user accepted results; 30-day clock starts
+    expired = "expired"                       # storage window elapsed; files purged
     failed = "failed"
 
 
@@ -109,6 +112,24 @@ class PaymentCallback(BaseModel):
     reference: str
     status: str
     signature: str | None = None
+
+
+# --------------------------------------------------------------------------- #
+# Pricing
+# --------------------------------------------------------------------------- #
+class EstimateRequest(BaseModel):
+    """User-supplied inputs for the price estimate (word count is user-chosen)."""
+
+    word_count: int = Field(..., ge=100, le=20000, description="Target words for the Results section")
+
+
+class PriceQuote(BaseModel):
+    amount_egp: int
+    currency: str = "EGP"
+    # Transparent line items so the user sees how the price was built.
+    breakdown: dict[str, int] = Field(default_factory=dict)
+    estimated_tests: int = 0
+    word_count: int = 0
 
 
 # --------------------------------------------------------------------------- #
@@ -186,6 +207,11 @@ class Run(BaseModel):
     protocol_text: str | None = None
     data_path: str | None = None
 
+    # pricing + payment (payment happens per-run, after the estimate)
+    quote: PriceQuote | None = None
+    paid: bool = False
+    payment_reference: str | None = None
+
     # working state
     data_summary: DataSummary | None = None
     proposed_test: ProposedTest | None = None
@@ -197,6 +223,11 @@ class Run(BaseModel):
     # outputs
     results_markdown: str | None = None
     docx_path: str | None = None
+    pdf_path: str | None = None
+
+    # lifecycle / retention
+    accepted_at: datetime | None = None
+    expires_at: datetime | None = None
 
     error: str | None = None
     created_at: datetime = Field(default_factory=_now)

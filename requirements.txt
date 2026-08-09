@@ -21,8 +21,9 @@ psycopg2-binary     # Postgres driver (only needed when using Postgres)
 pandas
 openpyxl            # .xlsx reading
 
-# --- Document export (Markdown -> .docx) ---
+# --- Document export (Markdown -> .docx / .pdf) ---
 python-docx
+reportlab           # PDF generation
 
 # --- AI / LLM ---
 openai              # Kimi is OpenAI-compatible; used via base_url override

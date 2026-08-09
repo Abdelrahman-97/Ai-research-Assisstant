@@ -1,4 +1,9 @@
-"""Shared API dependencies (current user, paid-access guard)."""
+"""Shared API dependencies (current user).
+
+Payment is enforced per-run in the orchestrator (not per-user), because pricing
+and payment happen after the free upload + estimate. So there is no user-level
+paywall dependency here.
+"""
 
 from __future__ import annotations
 
@@ -25,15 +30,5 @@ def get_current_user(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found."
-        )
-    return user
-
-
-def require_paid(user: User = Depends(get_current_user)) -> User:
-    """Guard the pipeline behind a completed payment."""
-    if not user.has_paid:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="Payment required before using the assistant.",
         )
     return user

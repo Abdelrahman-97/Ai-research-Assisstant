@@ -67,20 +67,31 @@ API on http://localhost:8000 (docs at /docs).
 
 ## API flow
 
+Upload and the price estimate are **free**; everything from the plan onward
+requires the run to be **paid**. Payment is per-run, priced from the data.
+
 ```
 POST /auth/signup            (email, password, scope: thesis|studies)
 POST /auth/login             -> JWT
-POST /payments/link          -> EasyKash payment URL
-POST /payments/callback      (EasyKash webhook) -> unlocks access
 POST /runs                   -> run_id
-POST /runs/{id}/upload       (protocol text + data file)
-POST /runs/{id}/plan         -> AI proposes plan (status: awaiting_approval)
+POST /runs/{id}/upload       (protocol text + data file)     -> uploaded
+POST /runs/{id}/estimate     (word_count) -> price quote      -> awaiting_payment
+POST /runs/{id}/pay-link     -> EasyKash payment URL
+POST /payments/callback      (EasyKash webhook) -> marks run  -> paid
+POST /runs/{id}/plan         -> AI proposes plan              -> awaiting_approval
 POST /runs/{id}/approve      -> HUMAN CHECKPOINT (confirm or edit)
-POST /runs/{id}/script       -> AI writes script (preview)
-POST /runs/{id}/execute      -> sandbox runs it
-POST /runs/{id}/results      -> AI verifies + writes Results, exports .docx
-GET  /runs/{id}/download     -> the .docx
+POST /runs/{id}/script       -> AI writes script (preview)    -> script_ready
+POST /runs/{id}/execute      -> sandbox runs it               -> executed
+POST /runs/{id}/results      -> AI verifies + writes Results  -> completed (docx + pdf)
+POST /runs/{id}/accept       -> user accepts -> 30-day clock  -> accepted
+GET  /runs/{id}/download?format=word|pdf   -> the document
+GET  /runs/{id}             -> poll status anytime
 ```
+
+**Pricing** is computed by `services/pricing.py` from scope + data size + estimated
+tests + word count, with tunable rates in config (`price_*`). **Retention:** files
+are purged 30 days after acceptance — run `python -m app.services.cleanup` on a
+daily cron.
 
 ## Getting started
 

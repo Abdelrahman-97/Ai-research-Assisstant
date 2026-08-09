@@ -1,7 +1,8 @@
 """Pipeline routes — one endpoint per stage of a run.
 
-All are gated behind a completed payment (require_paid). The endpoints map 1:1
-onto the orchestrator's state machine, with the human checkpoint at /approve.
+Auth is required throughout (get_current_user). Upload and the price estimate are
+FREE; everything from the plan onward requires the run to be paid (enforced in the
+orchestrator). The human checkpoint is at /approve.
 """
 
 from __future__ import annotations
@@ -9,19 +10,20 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 
-from app.api.deps import require_paid
+from app.api.deps import get_current_user
 from app.config import settings
 from app.models.schemas import (
+    EstimateRequest,
     Language,
-    ProposedTest,
+    PaymentLink,
     Run,
     TestConfirmation,
     User,
 )
-from app.services import orchestrator
+from app.services import cleanup, orchestrator, payments
 from app.services.orchestrator import PipelineError
 from app.store import repository
 
@@ -46,7 +48,7 @@ def _guard(fn):
 
 
 @router.post("", response_model=Run, status_code=status.HTTP_201_CREATED)
-def create_run(user: User = Depends(require_paid)) -> Run:
+def create_run(user: User = Depends(get_current_user)) -> Run:
     return orchestrator.create_run(user.id, user.task, user.scope)
 
 
@@ -55,7 +57,7 @@ async def upload(
     run_id: str,
     protocol: str = Form(..., description="Protocol / methods text"),
     data_file: UploadFile = File(...),
-    user: User = Depends(require_paid),
+    user: User = Depends(get_current_user),
 ) -> Run:
     run = _get_owned_run(run_id, user)
 
@@ -75,8 +77,31 @@ async def upload(
     return orchestrator.ingest(run, protocol_text=protocol, data_path=str(dest))
 
 
+@router.post("/{run_id}/estimate", response_model=Run)
+def estimate(
+    run_id: str,
+    body: EstimateRequest,
+    user: User = Depends(get_current_user),
+) -> Run:
+    """Free: compute the price from scope, data, estimated tests, and word count."""
+    run = _get_owned_run(run_id, user)
+    return _guard(lambda: orchestrator.estimate(run, body.word_count))
+
+
+@router.post("/{run_id}/pay-link", response_model=PaymentLink)
+def pay_link(run_id: str, user: User = Depends(get_current_user)) -> PaymentLink:
+    """Create the EasyKash payment link for this run's quoted price."""
+    run = _get_owned_run(run_id, user)
+    if run.quote is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Get a price estimate before requesting a payment link.",
+        )
+    return payments.create_payment_link(run.id, user.email, run.quote.amount_egp)
+
+
 @router.post("/{run_id}/plan", response_model=Run)
-def propose_plan(run_id: str, user: User = Depends(require_paid)) -> Run:
+def propose_plan(run_id: str, user: User = Depends(get_current_user)) -> Run:
     run = _get_owned_run(run_id, user)
     return _guard(lambda: orchestrator.propose_plan(run))
 
@@ -85,7 +110,7 @@ def propose_plan(run_id: str, user: User = Depends(require_paid)) -> Run:
 def approve_plan(
     run_id: str,
     confirmation: TestConfirmation,
-    user: User = Depends(require_paid),
+    user: User = Depends(get_current_user),
 ) -> Run:
     run = _get_owned_run(run_id, user)
     return _guard(lambda: orchestrator.approve_plan(run, confirmation))
@@ -95,39 +120,59 @@ def approve_plan(
 def generate_script(
     run_id: str,
     language: Language = Language.python,
-    user: User = Depends(require_paid),
+    user: User = Depends(get_current_user),
 ) -> Run:
     run = _get_owned_run(run_id, user)
     return _guard(lambda: orchestrator.generate_script(run, language))
 
 
 @router.post("/{run_id}/execute", response_model=Run)
-def execute(run_id: str, user: User = Depends(require_paid)) -> Run:
+def execute(run_id: str, user: User = Depends(get_current_user)) -> Run:
     run = _get_owned_run(run_id, user)
     return _guard(lambda: orchestrator.run_script(run))
 
 
 @router.post("/{run_id}/results", response_model=Run)
-def write_results(run_id: str, user: User = Depends(require_paid)) -> Run:
+def write_results(run_id: str, user: User = Depends(get_current_user)) -> Run:
     run = _get_owned_run(run_id, user)
     return _guard(lambda: orchestrator.write_results(run))
 
 
+@router.post("/{run_id}/accept", response_model=Run)
+def accept(run_id: str, user: User = Depends(get_current_user)) -> Run:
+    """User accepts the finished results — starts the 30-day retention window."""
+    run = _get_owned_run(run_id, user)
+    return _guard(lambda: orchestrator.accept(run))
+
+
 @router.get("/{run_id}", response_model=Run)
-def get_run(run_id: str, user: User = Depends(require_paid)) -> Run:
+def get_run(run_id: str, user: User = Depends(get_current_user)) -> Run:
     return _get_owned_run(run_id, user)
 
 
 @router.get("/{run_id}/download")
-def download_docx(run_id: str, user: User = Depends(require_paid)):
+def download(
+    run_id: str,
+    format: str = Query("word", pattern="^(word|pdf)$"),
+    user: User = Depends(get_current_user),
+):
+    """Download the results as Word (default) or PDF."""
     run = _get_owned_run(run_id, user)
-    if not run.docx_path or not Path(run.docx_path).exists():
+    if cleanup.is_expired(run):
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="This run's files have expired (30-day storage window elapsed).",
+        )
+
+    path = run.pdf_path if format == "pdf" else run.docx_path
+    if not path or not Path(path).exists():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No results document yet — complete the run first.",
         )
-    return FileResponse(
-        run.docx_path,
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        filename=f"results_{run_id}.docx",
+    media = (
+        "application/pdf"
+        if format == "pdf"
+        else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
+    return FileResponse(path, media_type=media, filename=f"results_{run_id}.{'pdf' if format=='pdf' else 'docx'}")
