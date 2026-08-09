@@ -29,6 +29,25 @@ class Settings(BaseSettings):
     # Sandbox
     sandbox_image: str = "research-assistant-sandbox:latest"
     sandbox_timeout_seconds: int = 120
+    # When Docker isn't available (e.g. early local dev), allow running scripts
+    # directly in a subprocess. NEVER enable this in production — it removes the
+    # isolation boundary. Off by default.
+    sandbox_allow_subprocess_fallback: bool = False
+
+    # Auth (JWT)
+    jwt_secret: str = "change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60 * 24  # 24h
+
+    # Payments (EasyKash)
+    easykash_api_key: str = ""
+    easykash_webhook_secret: str = ""
+    easykash_base_url: str = "https://back.easykash.net/api/v1"
+    # Price shown on the payment link, in EGP.
+    price_egp: int = 1000
+
+    # Storage — where uploads, generated scripts, and artifacts live at runtime.
+    data_dir: str = "data"
 
 
 @lru_cache
