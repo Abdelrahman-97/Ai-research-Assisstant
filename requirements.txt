@@ -15,7 +15,7 @@ openpyxl            # .xlsx reading
 python-docx
 
 # --- AI / LLM ---
-anthropic           # claude_client
+openai              # Kimi is OpenAI-compatible; used via base_url override
 
 # --- Grammar checking (local, no API key) ---
 language-tool-python

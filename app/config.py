@@ -16,8 +16,10 @@ class Settings(BaseSettings):
     app_env: str = "development"
     log_level: str = "INFO"
 
-    # Anthropic / Claude
-    anthropic_api_key: str = ""
+    # Kimi / Moonshot (OpenAI-compatible API)
+    moonshot_api_key: str = ""
+    kimi_base_url: str = "https://api.moonshot.ai/v1"
+    kimi_model: str = "kimi-k3"
 
     # External integrations
     copyleaks_api_key: str = ""
