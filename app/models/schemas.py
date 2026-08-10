@@ -133,7 +133,8 @@ class EstimateRequest(BaseModel):
 
 
 class PriceQuote(BaseModel):
-    amount_egp: int
+    amount_egp: int                      # what you net (your price)
+    customer_total_egp: int = 0          # what the customer is billed (incl. gateway fees)
     currency: str = "EGP"
     # Transparent line items so the user sees how the price was built.
     breakdown: dict[str, int] = Field(default_factory=dict)

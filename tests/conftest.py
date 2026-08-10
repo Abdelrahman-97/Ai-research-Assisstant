@@ -11,3 +11,6 @@ import tempfile
 _tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
 _tmp.close()
 os.environ["DATABASE_URL"] = f"sqlite:///{_tmp.name}"
+
+# Don't throttle the test suite.
+os.environ["RATE_LIMIT_ENABLED"] = "false"

@@ -87,6 +87,21 @@ def estimate_test_count(
         return fallback
 
 
+def gross_up_for_fees(net_egp: int) -> int:
+    """Amount to bill the customer so you net `net_egp` after EasyKash fees.
+
+    EasyKash takes a percentage commission plus a flat buyer surcharge. To keep
+    your target net, we divide by (1 - commission) and add the flat surcharge.
+
+    NOTE: the exact way EasyKash applies the commission and surcharge should be
+    confirmed against the merchant portal; the "pass fees to customer" toggle in
+    the dashboard can also handle this automatically (then just send your net).
+    """
+    rate = settings.easykash_commission_rate
+    flat = settings.easykash_flat_fee_egp
+    return math.ceil(net_egp / (1 - rate)) + flat
+
+
 def quote(
     *,
     scope: Scope,
@@ -113,8 +128,12 @@ def quote(
         f"data ({cells} cells)": data_cost,
     }
     total = base + tests_cost + words_cost + data_cost
+    customer_total = (
+        gross_up_for_fees(total) if settings.easykash_pass_fees_to_customer else total
+    )
     return PriceQuote(
         amount_egp=total,
+        customer_total_egp=customer_total,
         breakdown=breakdown,
         estimated_tests=n_tests,
         word_count=word_count,

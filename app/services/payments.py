@@ -38,13 +38,23 @@ def run_id_from_reference(reference: str) -> str | None:
     return None
 
 
-def _sign(reference: str) -> str:
-    """HMAC signature over the reference, used to validate callbacks."""
-    return hmac.new(
+def verify_raw_signature(raw_body: bytes, header_signature: str | None) -> bool:
+    """Verify an HMAC-SHA256 signature computed over the raw request body.
+
+    This is the common webhook-signing scheme. Confirm against EasyKash's portal
+    which value they sign and which header they send it in
+    (settings.easykash_signature_header).
+    """
+    if not settings.easykash_webhook_secret:
+        return True  # no secret configured -> signature check disabled (dev)
+    if not header_signature:
+        return False
+    expected = hmac.new(
         settings.easykash_webhook_secret.encode(),
-        reference.encode(),
+        raw_body,
         hashlib.sha256,
     ).hexdigest()
+    return hmac.compare_digest(expected, header_signature)
 
 
 def _build_link_request(email: str, reference: str, amount_egp: int) -> dict:
@@ -86,18 +96,13 @@ def create_payment_link(run_id: str, email: str, amount_egp: int) -> PaymentLink
     return PaymentLink(url=url, reference=reference, amount_egp=amount_egp)
 
 
-def verify_callback(callback: PaymentCallback) -> str | None:
-    """Validate a success callback. Returns the run id to unlock, or None.
+def resolve_paid_run(callback: PaymentCallback) -> str | None:
+    """Given a (signature-verified) callback, return the run id to unlock, or None.
 
-    Two checks: the status is a success, and (when a webhook secret is set) the
-    signature matches. Confirm EasyKash's real status string + signing scheme.
+    Signature authenticity is checked separately via verify_raw_signature at the
+    route. Here we only confirm the status is a success and map the reference back
+    to a run. Confirm EasyKash's real success status string.
     """
     if callback.status.lower() not in {"success", "paid", "completed"}:
         return None
-
-    if settings.easykash_webhook_secret:
-        expected = _sign(callback.reference)
-        if not callback.signature or not hmac.compare_digest(expected, callback.signature):
-            return None
-
     return run_id_from_reference(callback.reference)

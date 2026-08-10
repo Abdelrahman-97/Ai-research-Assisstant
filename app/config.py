@@ -43,6 +43,18 @@ class Settings(BaseSettings):
     easykash_api_key: str = ""
     easykash_webhook_secret: str = ""
     easykash_base_url: str = "https://back.easykash.net/api/v1"
+    # Header EasyKash sends the callback signature in. Confirm exact name in the
+    # merchant portal; this is the commonly-used default.
+    easykash_signature_header: str = "X-EasyKash-Signature"
+    # Fees: 3.5% commission + flat buyer surcharge (EGP). If pass_fees_to_customer
+    # is true, the customer is billed enough that you net your quoted price.
+    easykash_commission_rate: float = 0.035
+    easykash_flat_fee_egp: int = 5
+    easykash_pass_fees_to_customer: bool = True
+
+    # Security
+    rate_limit_enabled: bool = True
+    max_protocol_chars: int = 20000
 
     # --- Pricing (all EGP). Tunable — change these to reprice without code edits. ---
     price_base_thesis_egp: int = 1500     # base price for a thesis results chapter

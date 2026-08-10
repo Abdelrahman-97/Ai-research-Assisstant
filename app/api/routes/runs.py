@@ -10,11 +10,14 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import (
+    APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status,
+)
 from fastapi.responses import FileResponse
 
 from app.api.deps import get_current_user
 from app.config import settings
+from app.ratelimit import limiter
 from app.models.schemas import (
     CreateRunRequest,
     EstimateRequest,
@@ -49,7 +52,9 @@ def _guard(fn):
 
 
 @router.post("", response_model=Run, status_code=status.HTTP_201_CREATED)
+@limiter.limit("30/minute")
 def create_run(
+    request: Request,
     body: CreateRunRequest,
     user: User = Depends(get_current_user),
 ) -> Run:
@@ -72,6 +77,12 @@ async def upload(
 ) -> Run:
     run = _get_owned_run(run_id, user)
 
+    if len(protocol) > settings.max_protocol_chars:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Protocol too long (max {settings.max_protocol_chars} characters).",
+        )
+
     suffix = Path(data_file.filename or "").suffix.lower()
     if suffix not in _ALLOWED_SUFFIXES:
         raise HTTPException(
@@ -89,7 +100,9 @@ async def upload(
 
 
 @router.post("/{run_id}/estimate", response_model=Run)
+@limiter.limit("20/minute")
 def estimate(
+    request: Request,
     run_id: str,
     body: EstimateRequest,
     user: User = Depends(get_current_user),
@@ -101,14 +114,15 @@ def estimate(
 
 @router.post("/{run_id}/pay-link", response_model=PaymentLink)
 def pay_link(run_id: str, user: User = Depends(get_current_user)) -> PaymentLink:
-    """Create the EasyKash payment link for this run's quoted price."""
+    """Create the EasyKash payment link. Bills the customer total (incl. fees)."""
     run = _get_owned_run(run_id, user)
     if run.quote is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Get a price estimate before requesting a payment link.",
         )
-    return payments.create_payment_link(run.id, user.email, run.quote.amount_egp)
+    amount = run.quote.customer_total_egp or run.quote.amount_egp
+    return payments.create_payment_link(run.id, user.email, amount)
 
 
 @router.post("/{run_id}/plan", response_model=Run)

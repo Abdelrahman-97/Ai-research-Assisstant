@@ -35,6 +35,14 @@ def test_more_tests_and_words_cost_more():
     assert big.amount_egp > small.amount_egp
 
 
+def test_customer_total_grosses_up_for_fees():
+    import math
+    q = pricing.quote(scope=Scope.studies, data_summary=_summary(), n_tests=2, word_count=1000)
+    assert q.customer_total_egp >= q.amount_egp
+    expected = math.ceil(q.amount_egp / (1 - settings.easykash_commission_rate)) + settings.easykash_flat_fee_egp
+    assert q.customer_total_egp == expected
+
+
 def test_heuristic_test_count_fallback_no_api_key():
     # With no MOONSHOT_API_KEY, estimate_test_count falls back to the heuristic
     # (constructing KimiClient raises, which is caught).

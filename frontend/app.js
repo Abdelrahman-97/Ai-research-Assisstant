@@ -273,16 +273,26 @@ function viewEstimate() {
     <div class="btn-row"><button id="estimateBtn" class="btn btn-primary">Get price</button></div>`;
 }
 function viewPay() {
-  const q = state.run.quote;
-  const rows = q ? Object.entries(q.breakdown).map(([k, v]) =>
-    `<li><span class="k">${esc(k)}</span><span class="v">${v} EGP</span></li>`).join("") : "";
+  const q = state.run.quote || {};
+  const rows = Object.entries(q.breakdown || {}).map(([k, v]) =>
+    `<li><span class="k">${esc(k)}</span><span class="v">${v} EGP</span></li>`).join("");
+  const total = q.customer_total_egp || q.amount_egp || 0;
+  const fees = total - (q.amount_egp || 0);
+  const feeRow = fees > 0
+    ? `<li><span class="k">payment processing fees</span><span class="v">${fees} EGP</span></li>` : "";
   return `
     <h2>Your price</h2>
-    <p class="sub">Estimated ${q ? q.estimated_tests : "?"} statistical test(s) · ${q ? q.word_count : "?"} words.</p>
-    <div class="price-total">${q ? q.amount_egp : "?"} <small>EGP</small></div>
-    <ul class="breakdown">${rows}</ul>
+    <p class="sub">Estimated ${q.estimated_tests ?? "?"} statistical test(s) · ${q.word_count ?? "?"} words.</p>
+    <div class="price-total">${total} <small>EGP</small></div>
+    <ul class="breakdown">${rows}${feeRow}</ul>
+    <label class="agree">
+      <input type="checkbox" id="agree" />
+      <span>I agree to the <a class="link" href="terms.html" target="_blank">Terms of Service</a>
+      and <a class="link" href="refund.html" target="_blank">Refund Policy</a>, and understand that
+      completed tasks are processed immediately and are non-refundable.</span>
+    </label>
     <div class="btn-row">
-      <button id="payBtn" class="btn btn-primary">Proceed to payment</button>
+      <button id="payBtn" class="btn btn-primary" disabled>Proceed to payment</button>
       <button id="reEstimateBtn" class="btn btn-ghost">Change word count</button>
     </div>
     <p class="muted-note">After paying, this page updates automatically once the payment is confirmed.</p>`;
@@ -399,6 +409,12 @@ function bindRunHandlers() {
   if (reEstimateBtn) reEstimateBtn.onclick = async () => {
     // Go back to the word-count screen by treating the run as uploaded again (client-side).
     state.run = { ...state.run, status: "uploaded" }; render();
+  };
+
+  const agree = document.getElementById("agree");
+  if (agree) agree.onchange = () => {
+    const pb = document.getElementById("payBtn");
+    if (pb) pb.disabled = !agree.checked;
   };
 
   const payBtn = document.getElementById("payBtn");
