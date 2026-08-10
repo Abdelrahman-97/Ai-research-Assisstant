@@ -51,4 +51,4 @@ def test_bad_payment_callback_rejected():
 
 def test_unauthenticated_pipeline_blocked():
     # No token -> rejected before reaching any run logic.
-    assert client.post("/runs").status_code in (401, 403)
+    assert client.post("/runs", json={"scope": "thesis"}).status_code in (401, 403)

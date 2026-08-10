@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Research Assistant</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">📊 AI Research Assistant</div>
+    <div class="topbar-right">
+      <span id="userEmail" class="user-email"></span>
+      <button id="logoutBtn" class="btn btn-ghost hidden">Log out</button>
+    </div>
+  </header>
+
+  <main id="app" class="app"></main>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- API base URL. Change if the backend runs elsewhere. -->
+  <script>window.API_BASE = "http://localhost:8000";</script>
+  <script src="app.js"></script>
+</body>
+</html>

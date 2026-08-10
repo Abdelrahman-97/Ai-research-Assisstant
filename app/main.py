@@ -14,6 +14,7 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import auth, health, payments, runs
 from app.config import settings
@@ -40,7 +41,9 @@ _origins = ["*"] if settings.cors_origins.strip() == "*" else [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
-    allow_credentials=True,
+    # We authenticate with bearer tokens (not cookies), so credentials aren't
+    # needed — and "*" origins with credentials is invalid per the CORS spec.
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -49,6 +52,11 @@ app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(payments.router)
 app.include_router(runs.router)
+
+# Serve the frontend from /ui when the folder is present (dev convenience).
+_frontend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+if os.path.isdir(_frontend_dir):
+    app.mount("/ui", StaticFiles(directory=_frontend_dir, html=True), name="ui")
 
 
 @app.on_event("startup")

@@ -59,7 +59,8 @@ def test_every_endpoint(tmp_path):
     assert client.get("/auth/me", headers=auth).status_code == 200; hit.add("/auth/me")
     assert client.get("/auth/me").status_code in (401, 403)
 
-    run_id = client.post("/runs", headers=auth).json()["id"]; hit.add("/runs")
+    run_id = client.post("/runs", headers=auth, json={"scope": "studies"}).json()["id"]; hit.add("/runs")
+    assert client.get("/runs", headers=auth).status_code == 200  # list (same path "/runs")
 
     data = tmp_path / "d.csv"
     pd.DataFrame({"group": ["a", "a", "b", "b"], "score": [10, 11, 20, 21]}).to_csv(data, index=False)

@@ -57,7 +57,7 @@ def test_full_pipeline(tmp_path):
     pd.DataFrame({"group": ["a", "a", "a", "b", "b", "b"],
                   "score": [10, 12, 11, 20, 22, 19]}).to_csv(data, index=False)
 
-    run_id = client.post("/runs", headers=auth).json()["id"]
+    run_id = client.post("/runs", headers=auth, json={"scope": "studies"}).json()["id"]
 
     with data.open("rb") as f:
         up = client.post(f"/runs/{run_id}/upload", headers=auth,
@@ -104,7 +104,7 @@ def test_cannot_analyse_before_paying(tmp_path):
     auth = _auth("nopay@example.com")
     data = tmp_path / "d.csv"
     pd.DataFrame({"group": ["a", "b"], "score": [1, 2]}).to_csv(data, index=False)
-    run_id = client.post("/runs", headers=auth).json()["id"]
+    run_id = client.post("/runs", headers=auth, json={"scope": "studies"}).json()["id"]
     with data.open("rb") as f:
         client.post(f"/runs/{run_id}/upload", headers=auth,
                     data={"protocol": "x"}, files={"data_file": ("d.csv", f, "text/csv")})
@@ -117,7 +117,7 @@ def test_cannot_skip_human_checkpoint(tmp_path):
     auth = _auth("skip@example.com")
     data = tmp_path / "d.csv"
     pd.DataFrame({"group": ["a", "b"], "score": [1, 2]}).to_csv(data, index=False)
-    run_id = client.post("/runs", headers=auth).json()["id"]
+    run_id = client.post("/runs", headers=auth, json={"scope": "studies"}).json()["id"]
     with data.open("rb") as f:
         client.post(f"/runs/{run_id}/upload", headers=auth,
                     data={"protocol": "x"}, files={"data_file": ("d.csv", f, "text/csv")})

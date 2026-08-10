@@ -93,6 +93,18 @@ tests + word count, with tunable rates in config (`price_*`). **Retention:** fil
 are purged 30 days after acceptance — run `python -m app.services.cleanup` on a
 daily cron.
 
+## Frontend
+
+A no-build single-page app lives in `frontend/` (`index.html`, `styles.css`,
+`app.js`). It walks the whole journey: auth → new task (scope) → upload → price →
+pay → plan review/edit → script preview → run → results → accept → download
+(Word/PDF), plus a "My jobs" dashboard. It's driven entirely by each run's
+`status` from the API.
+
+With the backend running, open **http://localhost:8000/ui/** (the API serves the
+frontend from `/ui`). To point at a different backend, edit `window.API_BASE` in
+`frontend/index.html`.
+
 ## Getting started
 
 ```bash

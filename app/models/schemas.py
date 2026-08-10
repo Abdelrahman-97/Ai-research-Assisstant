@@ -64,6 +64,15 @@ class RunStatus(str, Enum):
 class SignupRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
+    # Task + scope are now chosen per-job (at run creation), so they are optional
+    # here and only act as the account's default.
+    task: TaskType = TaskType.results_section
+    scope: Scope = Scope.studies
+
+
+class CreateRunRequest(BaseModel):
+    """Task + scope are chosen when starting each job."""
+
     task: TaskType = TaskType.results_section
     scope: Scope
 

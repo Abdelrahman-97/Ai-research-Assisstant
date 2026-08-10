@@ -16,6 +16,7 @@ from fastapi.responses import FileResponse
 from app.api.deps import get_current_user
 from app.config import settings
 from app.models.schemas import (
+    CreateRunRequest,
     EstimateRequest,
     Language,
     PaymentLink,
@@ -48,8 +49,18 @@ def _guard(fn):
 
 
 @router.post("", response_model=Run, status_code=status.HTTP_201_CREATED)
-def create_run(user: User = Depends(get_current_user)) -> Run:
-    return orchestrator.create_run(user.id, user.task, user.scope)
+def create_run(
+    body: CreateRunRequest,
+    user: User = Depends(get_current_user),
+) -> Run:
+    return orchestrator.create_run(user.id, body.task, body.scope)
+
+
+@router.get("", response_model=list[Run])
+def list_runs(user: User = Depends(get_current_user)) -> list[Run]:
+    """List the current user's runs, newest first (for the dashboard)."""
+    runs = repository.runs.list_for_user(user.id)
+    return sorted(runs, key=lambda r: r.created_at, reverse=True)
 
 
 @router.post("/{run_id}/upload", response_model=Run)
