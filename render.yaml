@@ -1,0 +1,38 @@
+# Render blueprint. In Render: New + -> Blueprint -> point at this repo.
+# Creates a Python web service + a managed Postgres database.
+#
+# NOTE ON SCRIPT EXECUTION: Render's native runtime has no Docker daemon, so the
+# analysis sandbox (docker/Dockerfile.sandbox) cannot run here. To make /execute
+# work on Render you must set SANDBOX_ALLOW_SUBPROCESS_FALLBACK=true, which runs
+# the generated script WITHOUT container isolation. That is acceptable only as a
+# short-term MVP; see DEPLOYMENT.md for the security note and safer options.
+
+services:
+  - type: web
+    name: ai-research-assistant-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-research-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true          # Render generates a strong secret
+      - key: MOONSHOT_API_KEY
+        sync: false                  # set in the dashboard (secret)
+      - key: EASYKASH_API_KEY
+        sync: false
+      - key: EASYKASH_WEBHOOK_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false                  # set to your Vercel URL, e.g. https://yourapp.vercel.app
+      - key: SANDBOX_ALLOW_SUBPROCESS_FALLBACK
+        value: "false"               # see note above before enabling
+
+databases:
+  - name: ai-research-db
+    plan: free

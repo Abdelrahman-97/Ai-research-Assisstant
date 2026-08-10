@@ -20,6 +20,13 @@ from app.config import settings
 # Env var wins over the settings default (used by tests to point at a temp DB).
 DATABASE_URL = os.environ.get("DATABASE_URL", settings.database_url)
 
+# Managed Postgres providers (Render, Heroku) hand out URLs starting with
+# "postgres://", but SQLAlchemy needs an explicit driver. Normalize it.
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
+elif DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
+
 _connect_args: dict = {}
 _engine_kwargs: dict = {}
 if DATABASE_URL.startswith("sqlite"):
