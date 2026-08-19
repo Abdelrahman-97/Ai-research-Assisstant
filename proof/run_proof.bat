@@ -3,7 +3,8 @@ REM One-click proof runner for Windows. Double-click this file.
 setlocal
 cd /d "%~dp0.."
 
-where python >nul 2>nul && (set PY=python) || (set PY=py)
+REM Prefer the Python launcher (py), which avoids the Windows Store alias stub.
+where py >nul 2>nul && (set PY=py -3) || (set PY=python)
 
 echo Installing required packages (first run may take a minute)...
 %PY% -m pip install -r requirements.txt scipy matplotlib statsmodels

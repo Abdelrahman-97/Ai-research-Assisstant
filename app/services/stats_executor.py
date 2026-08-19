@@ -43,6 +43,12 @@ Rules:
 - Do NOT access the network. Do NOT install packages. Use only the standard
   scientific stack (for Python: pandas, numpy, scipy, statsmodels, matplotlib;
   for R: base + stats).
+- ROBUSTNESS (important): compute and print/save ALL statistics BEFORE creating any
+  figures, and wrap the entire figure/plotting section in a try/except (Python) or
+  tryCatch (R) that prints a warning and continues on error. A plotting failure
+  must NEVER prevent the statistical results from being printed and saved.
+- Use only CURRENT, non-deprecated library APIs. For matplotlib boxplots use
+  `tick_labels=` (NOT the removed `labels=`). Assume recent library versions.
 - Output ONLY the script. No explanation, no markdown code fence.
 
 Approved plan reasoning (for context): {reasoning}

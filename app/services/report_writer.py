@@ -24,11 +24,30 @@ from app.models.schemas import Artifact
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 _BULLET_RE = re.compile(r"^[-*]\s+(.*)$")
 _NUMBERED_RE = re.compile(r"^\d+[.)]\s+(.*)$")
-_BOLD_ITALIC_RE = re.compile(r"(\*\*.+?\*\*|\*.+?\*|_.+?_)")
+# NB: underscores are NOT treated as italics — research text and file names are
+# full of them (e.g. descriptive_statistics.csv), and doing so mangled them.
+# Backtick `code` spans are unwrapped to plain text.
+_BOLD_ITALIC_RE = re.compile(r"(\*\*.+?\*\*|\*.+?\*|`.+?`)")
+
+
+def _clean_latex(text: str) -> str:
+    """Strip leftover LaTeX so it doesn't render as literal characters.
+
+    The results prompt asks for plain text, but this is a safety net for any
+    stray math markup the model still emits.
+    """
+    text = text.replace("$", "")
+    text = re.sub(r"\\text\{([^}]*)\}", r"\1", text)
+    text = re.sub(r"\\mathrm\{([^}]*)\}", r"\1", text)
+    text = text.replace("\\times", "×").replace("\\le", "≤").replace("\\ge", "≥")
+    text = text.replace("\\%", "%").replace("\\,", " ").replace("\\ ", " ")
+    text = re.sub(r"\^\{?(-?\d+)\}?", r"^\1", text)  # keep exponents readable
+    return text
 
 
 def _add_runs_with_emphasis(paragraph, text: str) -> None:
-    """Add text to a paragraph, honouring **bold** and *italic* / _italic_."""
+    """Add text to a paragraph, honouring **bold** and *italic*; unwrap `code`."""
+    text = _clean_latex(text)
     for part in _BOLD_ITALIC_RE.split(text):
         if not part:
             continue
@@ -36,8 +55,8 @@ def _add_runs_with_emphasis(paragraph, text: str) -> None:
             paragraph.add_run(part[2:-2]).bold = True
         elif part.startswith("*") and part.endswith("*"):
             paragraph.add_run(part[1:-1]).italic = True
-        elif part.startswith("_") and part.endswith("_"):
-            paragraph.add_run(part[1:-1]).italic = True
+        elif part.startswith("`") and part.endswith("`"):
+            paragraph.add_run(part[1:-1])  # code -> plain text (keeps underscores)
         else:
             paragraph.add_run(part)
 
@@ -97,10 +116,16 @@ def markdown_to_docx(
 
 
 def _md_inline_to_html(text: str) -> str:
-    """Convert **bold** / *italic* / _italic_ to the minimal HTML reportlab accepts."""
+    """Convert **bold** / *italic* to minimal HTML reportlab accepts; unwrap `code`.
+
+    Underscores are left alone (they belong to file names / variables), and any
+    stray LaTeX is stripped. Ampersand/angle brackets are escaped for reportlab.
+    """
+    text = _clean_latex(text)
+    text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
     text = re.sub(r"(?<!\*)\*(?!\*)(.+?)\*(?!\*)", r"<i>\1</i>", text)
-    text = re.sub(r"_(.+?)_", r"<i>\1</i>", text)
+    text = re.sub(r"`(.+?)`", r"\1", text)  # code -> plain text
     return text
 
 

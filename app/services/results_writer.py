@@ -33,15 +33,21 @@ Write the Results section for a {scope} using ONLY the analysis output below.
 
 Requirements:
 - Report the test that was run: {test_name}.
-- State the key statistics exactly as they appear in the output (test statistic,
-  degrees of freedom, p-value, effect size, confidence intervals, group
-  descriptives).
-- Write in formal, past-tense academic English.
-- Reference tables/figures by their file names where relevant: {artifact_names}.
+- State the key statistics from the output (test statistic, degrees of freedom,
+  p-value, effect size, confidence intervals, group descriptives). You must not
+  introduce any number that is not in the output.
+- Round to journal convention: statistics and descriptives to 2 decimal places;
+  report p-values in APA style (e.g. "p < .001", otherwise 3 decimals like
+  "p = .032"). Round only for presentation — never change or invent a value.
+- Write in formal, past-tense academic English as PLAIN TEXT. Do NOT use LaTeX or
+  math notation: no "$", no "\\text{{}}", no "\\times". Write "mmHg", "×", "95% CI"
+  as plain characters.
+- Reference tables/figures by their file names in backticks, e.g.
+  `descriptive_statistics.csv`, so underscores are preserved: {artifact_names}.
 - If a standard value the reader would expect is absent from the output, add a
   short "[missing: ...]" note rather than fabricating it.
-- Output GitHub-flavoured Markdown. Do not include anything except the Results
-  section itself.
+- Output Markdown using only headings, paragraphs, and **bold**/*italic*. Do not
+  include anything except the Results section itself.
 
 Approved plan:
 - Test: {test_name}
