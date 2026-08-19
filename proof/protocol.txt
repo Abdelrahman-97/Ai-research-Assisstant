@@ -1,0 +1,24 @@
+Title: Effect of a new antihypertensive intervention on systolic blood pressure
+
+Background and aim:
+Hypertension is a major cardiovascular risk factor. This study evaluated whether a
+new antihypertensive intervention lowers systolic blood pressure compared with usual
+care.
+
+Design:
+A two-arm parallel randomised study. Participants were allocated to either the
+treatment group (new intervention) or the control group (usual care). The two groups
+are independent (each participant is in only one group).
+
+Participants:
+Adult patients with stage-1 hypertension. Both groups are comparable in age and sex.
+
+Outcome:
+The primary outcome is systolic blood pressure (mmHg), a continuous measurement, taken
+after the intervention period. The variable in the dataset is "systolic_bp", and the
+group allocation is the variable "group" (control vs treatment). "age" and "sex" are
+recorded as baseline characteristics.
+
+Hypothesis:
+The treatment group has a lower mean systolic blood pressure than the control group.
+We compare the mean systolic blood pressure between the two independent groups.

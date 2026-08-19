@@ -32,7 +32,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg2://research:research@db:5432/research_assistant
-      MOONSHOT_API_KEY: ${MOONSHOT_API_KEY:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       EASYKASH_API_KEY: ${EASYKASH_API_KEY:-}
       EASYKASH_WEBHOOK_SECRET: ${EASYKASH_WEBHOOK_SECRET:-}

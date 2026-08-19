@@ -22,7 +22,7 @@ services:
           property: connectionString
       - key: JWT_SECRET
         generateValue: true          # Render generates a strong secret
-      - key: MOONSHOT_API_KEY
+      - key: LLM_API_KEY
         sync: false                  # set in the dashboard (secret)
       - key: EASYKASH_API_KEY
         sync: false

@@ -1,6 +1,6 @@
 """Results writer (pipeline step 6: verify output, then write the Results section).
 
-Takes the executed run's output (stdout + any table artifacts) and asks Kimi to
+Takes the executed run's output (stdout + any table artifacts) and asks the model to
 (a) sanity-check that the numbers are internally consistent, then (b) write a
 Results section in Markdown grounded strictly in those numbers.
 
@@ -19,7 +19,7 @@ from app.models.schemas import (
     ProposedTest,
     Scope,
 )
-from app.services.llm_client import KimiClient
+from app.services.llm_client import LLMClient
 
 _SYSTEM = (
     "You are an academic writing assistant producing the Results section of a "
@@ -79,10 +79,10 @@ def write_results(
     test: ProposedTest,
     execution: ExecutionResult,
     scope: Scope,
-    client: KimiClient | None = None,
+    client: LLMClient | None = None,
 ) -> str:
     """Verify the output and return the Results section as Markdown."""
-    client = client or KimiClient()
+    client = client or LLMClient()
     artifact_names = ", ".join(a.caption or Path(a.path).name for a in execution.artifacts) or "(none)"
     prompt = _INSTRUCTIONS.format(
         scope=scope.value,

@@ -17,6 +17,7 @@ env/
 /uploads/
 /artifacts/
 /outputs/
+/proof/output/
 *.docx
 !templates/*.docx
 

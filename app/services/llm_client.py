@@ -1,9 +1,12 @@
-"""Kimi (Moonshot AI) LLM client.
+"""LLM client (any OpenAI-compatible provider).
 
-Kimi exposes an OpenAI-compatible API, so we use the official `openai` SDK and
-just point it at Kimi's base URL. Everything in the app that talks to the model
-goes through this one class, so prompts, model choice, and error handling live
-in a single place.
+Works with Google Gemini, Groq, OpenRouter, Ollama (local), Kimi/Moonshot, etc.
+— they all speak the OpenAI Chat Completions API, so we use the official `openai`
+SDK and point it at the provider's base URL. Switching providers is purely config
+(llm_base_url / llm_model / llm_api_key); no code changes here.
+
+Everything in the app that talks to the model goes through this one class, so
+prompts, model choice, and error handling live in a single place.
 
 This client is deliberately "dumb": it only does plumbing —
   - chat():      messages in, text out
@@ -13,8 +16,6 @@ The pipeline-specific prompts (propose a statistical plan, write a script,
 write the Results section) live in their own service files and *use* this client.
 
 Design note: the client never executes anything. It only produces text.
-
-Docs: https://platform.moonshot.ai/docs/guide/migrating-from-openai-to-kimi
 """
 
 from __future__ import annotations
@@ -34,21 +35,21 @@ class LLMError(RuntimeError):
     """Raised when the model call fails or returns unusable output."""
 
 
-class KimiClient:
+class LLMClient:
     def __init__(
         self,
         api_key: str | None = None,
         base_url: str | None = None,
         model: str | None = None,
     ):
-        self.api_key = api_key or settings.moonshot_api_key
-        self.base_url = base_url or settings.kimi_base_url
-        self.model = model or settings.kimi_model
+        self.api_key = api_key or settings.llm_api_key
+        self.base_url = base_url or settings.llm_base_url
+        self.model = model or settings.llm_model
 
         if not self.api_key:
             # Fail loudly at construction rather than deep inside a request.
             raise LLMError(
-                "MOONSHOT_API_KEY is not set. Add it to your .env file."
+                "LLM_API_KEY is not set. Add it to your .env file."
             )
 
         self._client = OpenAI(api_key=self.api_key, base_url=self.base_url)
@@ -64,11 +65,10 @@ class KimiClient:
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> str:
-        """Send messages to Kimi and return the reply text.
+        """Send messages to the model and return the reply text.
 
-        `temperature` is optional. Kimi's range is [0, 1] (unlike OpenAI's [0, 2]).
-        For k2.x models Kimi has fixed temperature rules, so we only pass it when
-        explicitly given.
+        `temperature` is optional and only passed when explicitly given — some
+        providers/models restrict its range or fix it, so we don't force a value.
         """
         kwargs: dict[str, Any] = {
             "model": model or self.model,
@@ -82,11 +82,11 @@ class KimiClient:
         try:
             completion = self._client.chat.completions.create(**kwargs)
         except Exception as exc:  # noqa: BLE001 - surface any SDK/HTTP error uniformly
-            raise LLMError(f"Kimi request failed: {exc}") from exc
+            raise LLMError(f"LLM request failed: {exc}") from exc
 
         content = completion.choices[0].message.content
         if not content:
-            raise LLMError("Kimi returned an empty response.")
+            raise LLMError("The model returned an empty response.")
         return content
 
     def chat_json(
@@ -113,7 +113,7 @@ class KimiClient:
             return json.loads(cleaned)
         except json.JSONDecodeError as exc:
             raise LLMError(
-                f"Expected JSON from Kimi but could not parse it: {exc}\n"
+                f"Expected JSON from the model but could not parse it: {exc}\n"
                 f"---\n{raw}\n---"
             ) from exc
 
@@ -123,6 +123,10 @@ class KimiClient:
             [{"role": "user", "content": "Reply with the single word: pong"}]
         )
         return "pong" in reply.lower()
+
+
+# Backward-compatible alias (older imports referenced KimiClient).
+KimiClient = LLMClient
 
 
 def _strip_code_fence(text: str) -> str:

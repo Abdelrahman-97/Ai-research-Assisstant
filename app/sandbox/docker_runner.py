@@ -85,7 +85,13 @@ def run_in_sandbox(
         workdir = Path(tmp)
         data_filename = _prepare_workdir(workdir, script, language, data_path)
 
-        if _docker_available():
+        use_subprocess = settings.sandbox_force_subprocess or (
+            not _docker_available() and settings.sandbox_allow_subprocess_fallback
+        )
+        if use_subprocess:
+            # DEV ONLY — no isolation. Used by the proof harness and local dev.
+            cmd = [_INTERPRETER[language], _SCRIPT_NAME[language]]
+        elif _docker_available():
             cmd = [
                 "docker", "run", "--rm",
                 "--network", "none",
@@ -95,9 +101,6 @@ def run_in_sandbox(
                 settings.sandbox_image,
                 _INTERPRETER[language], _SCRIPT_NAME[language],
             ]
-        elif settings.sandbox_allow_subprocess_fallback:
-            # DEV ONLY — no isolation.
-            cmd = [_INTERPRETER[language], _SCRIPT_NAME[language]]
         else:
             return ExecutionResult(
                 status=RunStatus.failed,

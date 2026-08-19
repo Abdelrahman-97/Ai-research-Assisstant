@@ -19,7 +19,7 @@ import math
 
 from app.config import settings
 from app.models.schemas import DataSummary, PriceQuote, Scope
-from app.services.llm_client import KimiClient, LLMError
+from app.services.llm_client import LLMClient, LLMError
 
 _ESTIMATE_SYSTEM = (
     "You are a biostatistician estimating scope of work. Given a study protocol "
@@ -59,12 +59,12 @@ def estimate_test_count(
     protocol: str,
     data_summary: DataSummary | None,
     *,
-    client: KimiClient | None = None,
+    client: LLMClient | None = None,
 ) -> int:
     """Estimate how many tests the analysis needs (AI, with heuristic fallback)."""
     fallback = _heuristic_test_count(data_summary)
     try:
-        client = client or KimiClient()
+        client = client or LLMClient()
         summary_text = (
             f"rows={data_summary.n_rows}, cols={data_summary.n_cols}"
             if data_summary

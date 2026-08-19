@@ -1,6 +1,6 @@
 """Planner (pipeline step 2: propose a statistical plan).
 
-Sends the data summary + the study protocol to Kimi and asks for a proposed
+Sends the data summary + the study protocol to the model and asks for a proposed
 statistical test with reasoning, in strict JSON. The result is a *proposal* —
 it does not run and is not trusted until the human approves it at the checkpoint.
 """
@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 
 from app.models.schemas import DataSummary, ProposedTest, Scope
-from app.services.llm_client import KimiClient
+from app.services.llm_client import LLMClient
 
 _SYSTEM = (
     "You are a biostatistics assistant helping a researcher choose the correct "
@@ -57,10 +57,10 @@ def propose_plan(
     protocol: str,
     data_summary: DataSummary,
     scope: Scope,
-    client: KimiClient | None = None,
+    client: LLMClient | None = None,
 ) -> ProposedTest:
-    """Ask Kimi to propose a statistical test. Returns a ProposedTest."""
-    client = client or KimiClient()
+    """Ask the model to propose a statistical test. Returns a ProposedTest."""
+    client = client or LLMClient()
     user_prompt = _INSTRUCTIONS.format(
         scope=scope.value,
         protocol=protocol.strip(),

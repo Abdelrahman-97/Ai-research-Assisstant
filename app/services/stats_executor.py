@@ -2,7 +2,7 @@
 
 Two responsibilities, kept separate on purpose:
 
-  generate_script()  — ask Kimi to write the analysis script from the APPROVED
+  generate_script()  — ask the model to write the analysis script from the APPROVED
                        plan. The script is returned for a mandatory human preview
                        before anything runs.
 
@@ -20,7 +20,7 @@ from pathlib import Path
 
 from app.models.schemas import ExecutionResult, Language, ProposedTest
 from app.sandbox.docker_runner import run_in_sandbox
-from app.services.llm_client import KimiClient
+from app.services.llm_client import LLMClient
 
 _SYSTEM = (
     "You are a careful data analyst. You write a single, self-contained "
@@ -56,10 +56,10 @@ def generate_script(
     data_filename: str,
     language: Language,
     *,
-    client: KimiClient | None = None,
+    client: LLMClient | None = None,
 ) -> str:
-    """Ask Kimi to write the analysis script. Returned for mandatory preview."""
-    client = client or KimiClient()
+    """Ask the model to write the analysis script. Returned for mandatory preview."""
+    client = client or LLMClient()
     lang = _LANG_NAMES[language]
     messages = [
         {"role": "system", "content": _SYSTEM.format(lang=lang)},

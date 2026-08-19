@@ -16,10 +16,12 @@ class Settings(BaseSettings):
     app_env: str = "development"
     log_level: str = "INFO"
 
-    # Kimi / Moonshot (OpenAI-compatible API)
-    moonshot_api_key: str = ""
-    kimi_base_url: str = "https://api.moonshot.ai/v1"
-    kimi_model: str = "kimi-k3"
+    # LLM (any OpenAI-compatible provider: Gemini, Groq, OpenRouter, Ollama, Kimi…).
+    # Switch providers by changing these three values — no code changes.
+    # Default points at Google Gemini's OpenAI-compatible endpoint.
+    llm_api_key: str = ""
+    llm_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    llm_model: str = "gemini-2.5-flash"
 
     # External integrations
     copyleaks_api_key: str = ""
@@ -33,6 +35,9 @@ class Settings(BaseSettings):
     # directly in a subprocess. NEVER enable this in production — it removes the
     # isolation boundary. Off by default.
     sandbox_allow_subprocess_fallback: bool = False
+    # Force subprocess execution even if Docker is present (used by the proof
+    # harness so it runs without building the sandbox image). Dev only.
+    sandbox_force_subprocess: bool = False
 
     # Auth (JWT)
     jwt_secret: str = "change-me-in-production"
