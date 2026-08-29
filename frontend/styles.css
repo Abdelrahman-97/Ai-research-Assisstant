@@ -162,3 +162,62 @@ pre.code {
 .wa-fab svg { display: block; }
 @media (max-width: 520px) { .wa-fab span { display: none; } .wa-fab { padding: 14px; } }
 .muted-note { font-size: 13px; color: var(--muted); margin-top: 12px; }
+
+/* ============================================================
+   iOS-style polish: translucent bar, safe areas, tap feedback,
+   dark mode. Progressive — older browsers keep the base styles.
+   ============================================================ */
+
+/* Softer, larger rounding + tactile press feedback */
+.card { border-radius: 16px; }
+.btn { border-radius: 12px; transition: transform .12s ease, background .15s ease; }
+.btn:active { transform: scale(0.97); }
+.run-item:active, .choice:active { transform: scale(0.99); }
+
+/* Translucent, blurred sticky top bar (falls back to solid) */
+.topbar {
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  padding-top: calc(14px + env(safe-area-inset-top));
+  padding-left: calc(24px + env(safe-area-inset-left));
+  padding-right: calc(24px + env(safe-area-inset-right));
+}
+
+/* Content respects the notch / home indicator + smooth momentum scroll */
+.app { padding-bottom: calc(60px + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch; }
+
+/* Toast: fixed dark chip so it stays readable in light AND dark mode */
+.toast { background: #1f232b; }
+
+/* Phone refinements: bigger tap targets, no iOS zoom-on-focus (16px inputs) */
+@media (max-width: 640px) {
+  .app { padding: 18px 16px calc(40px + env(safe-area-inset-bottom)); }
+  h1 { font-size: 22px; }
+  .card { padding: 20px; border-radius: 18px; }
+  .btn { padding: 14px 18px; font-size: 16px; }
+  input, textarea, select { font-size: 16px; padding: 13px 14px; }
+  .wa-fab { bottom: calc(20px + env(safe-area-inset-bottom)); }
+}
+
+/* Dark mode (auto — follows the phone/OS setting) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --surface: #171a21;
+    --ink: #f2f3f5;
+    --muted: #9aa0ab;
+    --line: #262a33;
+    --line-strong: #333a47;
+    --accent: #7c83ff;
+    --accent-ink: #6366f1;
+  }
+  input, textarea, select, .run-item, .choice { background: #171a21; }
+  .btn-ghost:hover { background: #20242d; }
+  .choice.active { background: #20233a; }
+  .step { background: #20242d; }
+  .md { background: #14171d; }
+  pre.code { background: #0c0d10; }
+  .tag { background: #20242d; }
+  .site-footer a { color: var(--muted); }
+}
