@@ -43,6 +43,18 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24  # 24h
+    verify_token_minutes: int = 60 * 24        # email verification link: 24h
+    reset_token_minutes: int = 30              # password reset link: 30 min
+
+    # Email (SMTP). If smtp_host is empty, emails are logged instead of sent (dev).
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_use_tls: bool = True
+    # Base URL of the frontend, used to build verification/reset links.
+    frontend_url: str = "http://localhost:8000/ui"
 
     # Payments (EasyKash)
     easykash_api_key: str = ""

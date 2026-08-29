@@ -102,6 +102,9 @@ function renderAuth() {
         <span id="switchText">No account?</span>
         <button class="link" id="switchMode">Sign up</button>
       </p>
+      <p class="muted-note center" id="forgotWrap">
+        <button class="link" id="forgotLink">Forgot password?</button>
+      </p>
     </div>`;
 
   const setMode = (m) => {
@@ -112,8 +115,10 @@ function renderAuth() {
     document.getElementById("switchText").textContent = m === "login" ? "No account?" : "Already have an account?";
     document.getElementById("switchMode").textContent = m === "login" ? "Sign up" : "Log in";
     document.getElementById("scopeWrap").classList.toggle("hidden", m === "login");
+    document.getElementById("forgotWrap").classList.toggle("hidden", m !== "login");
   };
   document.getElementById("switchMode").onclick = () => setMode(mode === "login" ? "signup" : "login");
+  document.getElementById("forgotLink").onclick = () => { state.view = "forgot"; render(); };
 
   document.getElementById("submitAuth").onclick = async () => {
     const email = document.getElementById("email").value.trim();
@@ -128,6 +133,31 @@ function renderAuth() {
       state.token = data.access_token; state.user = data.user;
       localStorage.setItem("ra_token", state.token);
       state.view = "dashboard"; render();
+    } catch (e) { toast(e.message, true); }
+  };
+}
+
+/* --- Forgot password --- */
+function renderForgot() {
+  app.innerHTML = `
+    <div class="card" style="max-width:440px;margin:40px auto;">
+      <h1>Reset your password</h1>
+      <p class="sub">Enter your email and we'll send you a reset link.</p>
+      <label>Email</label>
+      <input id="fpEmail" type="email" placeholder="you@example.com" />
+      <div class="btn-row">
+        <button id="fpSend" class="btn btn-primary btn-block">Send reset link</button>
+      </div>
+      <p class="muted-note center"><button class="link" id="fpBack">← Back to sign in</button></p>
+    </div>`;
+  document.getElementById("fpBack").onclick = () => { state.view = "auth"; render(); };
+  document.getElementById("fpSend").onclick = async () => {
+    const email = document.getElementById("fpEmail").value.trim();
+    if (!email) return toast("Enter your email.", true);
+    try {
+      await api("/auth/forgot-password", { method: "POST", body: { email } });
+      toast("If that email is registered, a reset link was sent. Check your inbox.");
+      setTimeout(() => { state.view = "auth"; render(); }, 1500);
     } catch (e) { toast(e.message, true); }
   };
 }
@@ -147,7 +177,15 @@ async function renderDashboard() {
       ${statusPill(r.status)}
     </div>`).join("") : `<p class="sub">No jobs yet. Start your first one.</p>`;
 
+  const verifyBanner = (state.user && !state.user.email_verified) ? `
+    <div class="card" style="border-color:var(--accent);background:#fbf3ea;">
+      <strong>Verify your email.</strong>
+      <span class="sub">We sent a link to ${esc(state.user.email)}. </span>
+      <button class="link" id="resendVerify">Resend</button>
+    </div>` : "";
+
   app.innerHTML = `
+    ${verifyBanner}
     <div class="card">
       <h1>Your workspace</h1>
       <p class="sub">Start a new Results section, or continue a job.</p>
@@ -160,6 +198,11 @@ async function renderDashboard() {
     </div>`;
 
   document.getElementById("newTaskBtn").onclick = () => { state.view = "newtask"; render(); };
+  const resend = document.getElementById("resendVerify");
+  if (resend) resend.onclick = async () => {
+    try { await api("/auth/resend-verification", { method: "POST", body: { email: state.user.email } });
+      toast("Verification email resent."); } catch (e) { toast(e.message, true); }
+  };
   document.querySelectorAll(".run-item").forEach(el =>
     el.onclick = () => openRun(el.dataset.id));
 }
@@ -534,6 +577,7 @@ function render() {
   if (!state.token) { state.view = "auth"; }
   switch (state.view) {
     case "auth": renderAuth(); break;
+    case "forgot": renderForgot(); break;
     case "dashboard": renderDashboard(); break;
     case "newtask": renderNewTask(); break;
     case "run": state.run ? renderRun() : renderDashboard(); break;

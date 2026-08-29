@@ -59,6 +59,12 @@ def test_every_endpoint(tmp_path):
     assert client.get("/auth/me", headers=auth).status_code == 200; hit.add("/auth/me")
     assert client.get("/auth/me").status_code in (401, 403)
 
+    # account-management endpoints (full flows are in test_email_auth.py)
+    client.post("/auth/verify-email", json={"token": "x"}); hit.add("/auth/verify-email")
+    client.post("/auth/resend-verification", json={"email": "all@ep.com"}); hit.add("/auth/resend-verification")
+    client.post("/auth/forgot-password", json={"email": "all@ep.com"}); hit.add("/auth/forgot-password")
+    client.post("/auth/reset-password", json={"token": "x", "new_password": "supersecret"}); hit.add("/auth/reset-password")
+
     run_id = client.post("/runs", headers=auth, json={"scope": "studies"}).json()["id"]; hit.add("/runs")
     assert client.get("/runs", headers=auth).status_code == 200  # list (same path "/runs")
 

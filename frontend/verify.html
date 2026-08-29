@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verify email — AI Research Assistant</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar"><div class="brand">📊 AI Research Assistant</div></header>
+  <main class="app">
+    <div class="card" style="max-width:460px;margin:40px auto;text-align:center;">
+      <h1>Email verification</h1>
+      <p id="msg" class="sub">Verifying your email…</p>
+      <div id="spin" class="spinner-lg"></div>
+      <div class="btn-row" style="justify-content:center;">
+        <a class="btn btn-primary" href="index.html">Go to the app</a>
+      </div>
+    </div>
+  </main>
+  <script src="config.js"></script>
+  <script>
+    (async function () {
+      const token = new URLSearchParams(location.search).get("token");
+      const msg = document.getElementById("msg");
+      const spin = document.getElementById("spin");
+      const done = (text, ok) => { spin.style.display = "none"; msg.textContent = text; msg.style.color = ok ? "var(--ok)" : "var(--err)"; };
+      if (!token) return done("No verification token found in the link.", false);
+      try {
+        const res = await fetch((window.API_BASE || "") + "/auth/verify-email", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token })
+        });
+        if (res.ok) done("✓ Your email is verified. You can close this tab.", true);
+        else { const d = await res.json().catch(() => ({})); done(d.detail || "Verification failed. The link may have expired.", false); }
+      } catch (e) { done("Could not reach the server. Try again later.", false); }
+    })();
+  </script>
+</body>
+</html>

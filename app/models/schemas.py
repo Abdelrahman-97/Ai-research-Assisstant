@@ -82,12 +82,30 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=8)
+
+
+class TokenRequest(BaseModel):
+    token: str
+
+
+class EmailRequest(BaseModel):
+    email: EmailStr
+
+
 class UserPublic(BaseModel):
     id: str
     email: EmailStr
     task: TaskType
     scope: Scope
     has_paid: bool = False
+    email_verified: bool = False
     created_at: datetime = Field(default_factory=_now)
 
 
@@ -95,6 +113,8 @@ class User(UserPublic):
     """Internal user record — includes the password hash. Never returned to clients."""
 
     password_hash: str
+    # Bumped on password reset to invalidate old sessions and used reset links.
+    token_version: int = 0
 
 
 class TokenResponse(BaseModel):

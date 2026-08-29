@@ -20,15 +20,21 @@ _bearer = HTTPBearer(auto_error=True)
 def get_current_user(
     creds: HTTPAuthorizationCredentials = Depends(_bearer),
 ) -> User:
-    user_id = decode_access_token(creds.credentials)
-    if not user_id:
+    payload = decode_access_token(creds.credentials)
+    if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token.",
         )
-    user = repository.users.get(user_id)
+    user = repository.users.get(payload["sub"])
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found."
+        )
+    # Token version must match — a password reset bumps it, logging out old sessions.
+    if int(payload.get("tv", 0)) != user.token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired, please log in again.",
         )
     return user
