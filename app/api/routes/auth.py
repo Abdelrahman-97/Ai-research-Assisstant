@@ -23,7 +23,7 @@ from app.models.schemas import (
     UserPublic,
 )
 from app.ratelimit import limiter
-from app.services import email
+from app.services import cleanup, email
 from app.services.security import (
     create_access_token,
     create_email_token,
@@ -85,6 +85,18 @@ def login(request: Request, body: LoginRequest) -> TokenResponse:
 @router.get("/me", response_model=UserPublic)
 def me(user: User = Depends(get_current_user)) -> UserPublic:
     return UserPublic(**user.model_dump())
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+def delete_account(user: User = Depends(get_current_user)) -> None:
+    """Permanently delete the account, its runs, and all associated files.
+
+    Honours the data-deletion right stated in the Privacy Policy.
+    """
+    for run in repository.runs.list_for_user(user.id):
+        cleanup._delete_run_files(run)
+    repository.runs.delete_for_user(user.id)
+    repository.users.delete(user.id)
 
 
 @router.post("/verify-email", response_model=UserPublic)

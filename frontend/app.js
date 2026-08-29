@@ -195,9 +195,19 @@ async function renderDashboard() {
       <h2>My jobs</h2>
       <p class="sub">Files are kept 30 days after you accept the results.</p>
       <div id="runsList" style="margin-top:12px;">${items}</div>
-    </div>`;
+    </div>
+    <p class="muted-note center"><button class="link" id="deleteAccount" style="color:var(--err);">Delete my account and all data</button></p>`;
 
   document.getElementById("newTaskBtn").onclick = () => { state.view = "newtask"; render(); };
+  document.getElementById("deleteAccount").onclick = async () => {
+    if (!confirm("Permanently delete your account, all jobs, and all files? This cannot be undone.")) return;
+    try {
+      await api("/auth/me", { method: "DELETE" });
+      toast("Account deleted.");
+      state.token = null; state.user = null; localStorage.removeItem("ra_token");
+      state.view = "auth"; render();
+    } catch (e) { toast(e.message, true); }
+  };
   const resend = document.getElementById("resendVerify");
   if (resend) resend.onclick = async () => {
     try { await api("/auth/resend-verification", { method: "POST", body: { email: state.user.email } });
@@ -282,7 +292,10 @@ function renderRun() {
     case "completed":
     case "accepted": inner = viewResults(); break;
     case "expired": inner = `<p class="sub">This job's files have expired (30-day window).</p>`; break;
-    case "failed": inner = `<p><span class="pill err">Failed</span></p><p class="sub">${esc(r.error || "Something went wrong.")}</p>`; break;
+    case "failed":
+      inner = `<p><span class="pill err">Failed</span></p><p class="sub">${esc(r.error || "Something went wrong.")}</p>`
+        + (r.approved_test ? `<div class="btn-row"><button id="retryScript" class="btn btn-primary">Regenerate script & retry</button></div>` : "");
+      break;
     default: inner = `<p class="sub">Status: ${r.status}</p>`;
   }
   app.innerHTML = runShell(inner);
@@ -497,6 +510,11 @@ function bindRunHandlers() {
   });
   const genScriptBtn = document.getElementById("genScriptBtn");
   if (genScriptBtn) genScriptBtn.onclick = () => step("genScriptBtn", async () => {
+    state.run = await api(`/runs/${r.id}/script?language=${state.language}`, { method: "POST" }); render();
+  });
+
+  const retryScript = document.getElementById("retryScript");
+  if (retryScript) retryScript.onclick = () => step("retryScript", async () => {
     state.run = await api(`/runs/${r.id}/script?language=${state.language}`, { method: "POST" }); render();
   });
 

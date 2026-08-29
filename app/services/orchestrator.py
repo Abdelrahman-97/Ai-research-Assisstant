@@ -138,9 +138,14 @@ def approve_plan(run: Run, confirmation: TestConfirmation) -> Run:
 
 
 def generate_script(run: Run, language: Language) -> Run:
-    """Step 4: AI writes the script. Returned for mandatory preview before running."""
+    """Step 4: AI writes the script. Returned for mandatory preview before running.
+
+    Also usable as a retry: after a failed execution the user can regenerate the
+    script and run again (the approved plan is preserved).
+    """
     _require_paid(run)
-    if run.status != RunStatus.approved or run.approved_test is None:
+    retryable = {RunStatus.approved, RunStatus.script_ready, RunStatus.failed}
+    if run.status not in retryable or run.approved_test is None:
         raise PipelineError("Approve a plan before generating a script.")
 
     data_filename = f"data{Path(run.data_path).suffix.lower()}" if run.data_path else "data.csv"
@@ -184,21 +189,26 @@ def write_results(run: Run) -> Run:
     run.status = RunStatus.writing
     _touch(run)
 
-    markdown = results_writer.write_results(
-        test=run.approved_test,
-        execution=run.execution,
-        scope=run.scope,
-    )
-    run.results_markdown = markdown
+    try:
+        markdown = results_writer.write_results(
+            test=run.approved_test,
+            execution=run.execution,
+            scope=run.scope,
+        )
+        out_dir = Path(settings.data_dir) / "outputs"
+        docx_path = out_dir / f"results_{run.id}.docx"
+        pdf_path = out_dir / f"results_{run.id}.pdf"
+        report_writer.markdown_to_docx(markdown, run.execution.artifacts, docx_path)
+        report_writer.markdown_to_pdf(markdown, run.execution.artifacts, pdf_path)
+    except Exception:
+        # Revert so the user can retry writing without re-running the analysis.
+        run.status = RunStatus.executed
+        _touch(run)
+        raise
 
-    out_dir = Path(settings.data_dir) / "outputs"
-    docx_path = out_dir / f"results_{run.id}.docx"
-    pdf_path = out_dir / f"results_{run.id}.pdf"
-    report_writer.markdown_to_docx(markdown, run.execution.artifacts, docx_path)
-    report_writer.markdown_to_pdf(markdown, run.execution.artifacts, pdf_path)
+    run.results_markdown = markdown
     run.docx_path = str(docx_path)
     run.pdf_path = str(pdf_path)
-
     run.status = RunStatus.completed
     return _touch(run)
 

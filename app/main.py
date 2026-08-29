@@ -19,7 +19,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi import _rate_limit_exceeded_handler
 
-from app.api.routes import auth, health, payments, runs
+from app.api.routes import admin, auth, health, payments, runs
 from app.config import settings
 from app.db import init_db
 from app.ratelimit import limiter
@@ -60,6 +60,7 @@ app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(payments.router)
 app.include_router(runs.router)
+app.include_router(admin.router)
 
 # Serve the frontend from /ui when the folder is present (dev convenience).
 _frontend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")

@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
     llm_model: str = "gemini-2.5-flash"
+    llm_timeout_seconds: int = 60      # per-request timeout
+    llm_max_retries: int = 2           # SDK retries transient errors (429/5xx/network)
 
     # External integrations
     copyleaks_api_key: str = ""
@@ -72,6 +74,11 @@ class Settings(BaseSettings):
     # Security
     rate_limit_enabled: bool = True
     max_protocol_chars: int = 20000
+    max_upload_mb: int = 25              # reject data files larger than this
+    max_summary_columns: int = 60        # cap columns described to the model
+
+    # Admin/ops. If set, unlocks the /admin endpoints (guarded by this token).
+    admin_token: str = ""
 
     # --- Pricing (all EGP). Tunable — change these to reprice without code edits. ---
     price_base_thesis_egp: int = 1500     # base price for a thesis results chapter

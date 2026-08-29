@@ -103,6 +103,12 @@ def test_every_endpoint(tmp_path):
 
     assert client.get("/runs/does-not-exist", headers=auth).status_code == 404
 
+    # account deletion + admin (full flows in test_hardening.py) — hit for coverage
+    client.delete("/auth/me", headers=auth); hit.add("/auth/me")
+    for p in ("/admin/stats", "/admin/runs"):
+        client.get(p); hit.add(p)
+    client.post("/admin/runs/x/refund"); hit.add("/admin/runs/{run_id}/refund")
+
     declared = {
         pth for pth in app.openapi()["paths"]
         if not any(x in pth for x in ("openapi", "docs", "redoc"))

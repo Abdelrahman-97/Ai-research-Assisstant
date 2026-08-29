@@ -52,7 +52,14 @@ class LLMClient:
                 "LLM_API_KEY is not set. Add it to your .env file."
             )
 
-        self._client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+        # timeout + retries let the SDK ride out transient 429/5xx/network blips
+        # (important on free tiers with tight rate limits).
+        self._client = OpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url,
+            timeout=settings.llm_timeout_seconds,
+            max_retries=settings.llm_max_retries,
+        )
 
     # ------------------------------------------------------------------ #
     # Core calls

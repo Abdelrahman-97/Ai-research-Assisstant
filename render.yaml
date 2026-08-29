@@ -30,8 +30,24 @@ services:
         sync: false
       - key: CORS_ORIGINS
         sync: false                  # set to your Vercel URL, e.g. https://yourapp.vercel.app
+      - key: FRONTEND_URL
+        sync: false                  # your Vercel URL — used to build verify/reset email links
       - key: SANDBOX_ALLOW_SUBPROCESS_FALLBACK
         value: "false"               # see note above before enabling
+      # Email (verification + password reset). Use a provider like SendGrid/Mailgun.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      # Ops: set to enable the /admin endpoints (sent in the X-Admin-Token header).
+      - key: ADMIN_TOKEN
+        sync: false
 
 databases:
   - name: ai-research-db

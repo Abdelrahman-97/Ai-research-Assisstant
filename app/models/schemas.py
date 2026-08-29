@@ -241,6 +241,7 @@ class Run(BaseModel):
     quote: PriceQuote | None = None
     paid: bool = False
     payment_reference: str | None = None
+    refunded: bool = False
 
     # working state
     data_summary: DataSummary | None = None

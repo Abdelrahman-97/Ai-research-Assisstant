@@ -51,6 +51,17 @@ class UserRepository:
             s.commit()
         return user
 
+    def delete(self, user_id: str) -> None:
+        with SessionLocal() as s:
+            row = s.get(UserRow, user_id)
+            if row:
+                s.delete(row)
+                s.commit()
+
+    def all(self) -> list[User]:
+        with SessionLocal() as s:
+            return [User.model_validate_json(r.data) for r in s.query(UserRow).all()]
+
 
 class RunRepository:
     def create(self, run: Run) -> Run:
@@ -82,6 +93,15 @@ class RunRepository:
     def all(self) -> list[Run]:
         with SessionLocal() as s:
             return [Run.model_validate_json(r.data) for r in s.query(RunRow).all()]
+
+    def delete_for_user(self, user_id: str) -> int:
+        with SessionLocal() as s:
+            rows = s.query(RunRow).filter(RunRow.user_id == user_id).all()
+            n = len(rows)
+            for row in rows:
+                s.delete(row)
+            s.commit()
+            return n
 
 
 # Module-level singletons used across the app.

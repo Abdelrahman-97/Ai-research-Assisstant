@@ -34,9 +34,15 @@ def read_dataframe(path: str | Path) -> pd.DataFrame:
 
 
 def summarize(df: pd.DataFrame) -> DataSummary:
-    """Build a compact, model-friendly summary of a DataFrame."""
+    """Build a compact, model-friendly summary of a DataFrame.
+
+    n_rows / n_cols reflect the full file, but the per-column detail is capped
+    (settings.max_summary_columns) so a very wide file can't blow up the prompt.
+    """
+    from app.config import settings
+
     columns: list[ColumnSummary] = []
-    for name in df.columns:
+    for name in df.columns[: settings.max_summary_columns]:
         series = df[name]
         samples = (
             series.dropna().unique()[:_SAMPLE_VALUES].tolist()

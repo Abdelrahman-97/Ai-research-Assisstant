@@ -28,6 +28,7 @@ from app.models.schemas import (
     User,
 )
 from app.services import cleanup, orchestrator, payments
+from app.services.llm_client import LLMError
 from app.services.orchestrator import PipelineError
 from app.store import repository
 
@@ -44,11 +45,17 @@ def _get_owned_run(run_id: str, user: User) -> Run:
 
 
 def _guard(fn):
-    """Translate orchestrator PipelineErrors into 409 responses."""
+    """Translate pipeline/LLM errors into clean HTTP responses."""
     try:
         return fn()
     except PipelineError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except LLMError as exc:
+        # AI provider timed out / rate-limited / errored — retryable.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The AI service is temporarily unavailable. Please try again in a moment.",
+        ) from exc
 
 
 @router.post("", response_model=Run, status_code=status.HTTP_201_CREATED)
@@ -93,8 +100,21 @@ async def upload(
     dest_dir = Path(settings.data_dir) / "uploads" / run_id
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest = dest_dir / f"data{suffix}"
+
+    # Stream to disk with a size cap, aborting (and cleaning up) if exceeded.
+    limit = settings.max_upload_mb * 1024 * 1024
+    written = 0
     with dest.open("wb") as f:
-        shutil.copyfileobj(data_file.file, f)
+        while chunk := await data_file.read(1024 * 1024):
+            written += len(chunk)
+            if written > limit:
+                f.close()
+                dest.unlink(missing_ok=True)
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=f"File too large (max {settings.max_upload_mb} MB).",
+                )
+            f.write(chunk)
 
     return orchestrator.ingest(run, protocol_text=protocol, data_path=str(dest))
 
