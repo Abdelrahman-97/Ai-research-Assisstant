@@ -5,7 +5,7 @@
 (function () {
   var wa = (window.SUPPORT_WHATSAPP || "").replace(/[^0-9]/g, "");
   var email = window.SUPPORT_EMAIL || "";
-  var greeting = encodeURIComponent("Hi! I need help with the AI Research Assistant.");
+  var greeting = encodeURIComponent("Hi! I need help with Neura.");
   var waLink = wa ? "https://wa.me/" + wa + "?text=" + greeting : null;
 
   // Fill inline contact links (footers, policy pages).

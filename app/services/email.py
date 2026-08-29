@@ -39,8 +39,8 @@ def _deliver(to: str, subject: str, body: str) -> None:
 def send_verification(to: str, link: str) -> None:
     _deliver(
         to,
-        "Verify your email — AI Research Assistant",
-        "Welcome to AI Research Assistant!\n\n"
+        "Verify your email — Neura",
+        "Welcome to Neura!\n\n"
         f"Please verify your email address by opening this link:\n{link}\n\n"
         "If you didn't create an account, you can ignore this email.",
     )
@@ -49,7 +49,7 @@ def send_verification(to: str, link: str) -> None:
 def send_password_reset(to: str, link: str) -> None:
     _deliver(
         to,
-        "Reset your password — AI Research Assistant",
+        "Reset your password — Neura",
         "We received a request to reset your password.\n\n"
         f"Open this link to choose a new password:\n{link}\n\n"
         "This link expires shortly. If you didn't request it, ignore this email "

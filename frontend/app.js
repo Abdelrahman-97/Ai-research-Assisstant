@@ -1,4 +1,4 @@
-/* AI Research Assistant — single-page frontend (vanilla JS, no build step).
+/* Neura — single-page frontend (vanilla JS, no build step).
  * Talks to the FastAPI backend at window.API_BASE.
  * Screens are driven by the run's `status` returned from the API. */
 
@@ -178,7 +178,7 @@ async function renderDashboard() {
     </div>`).join("") : `<p class="sub">No jobs yet. Start your first one.</p>`;
 
   const verifyBanner = (state.user && !state.user.email_verified) ? `
-    <div class="card" style="border-color:var(--accent);background:#fbf3ea;">
+    <div class="card" style="border-color:var(--accent);background:#EEF0FF;">
       <strong>Verify your email.</strong>
       <span class="sub">We sent a link to ${esc(state.user.email)}. </span>
       <button class="link" id="resendVerify">Resend</button>

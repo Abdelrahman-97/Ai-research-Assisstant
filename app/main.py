@@ -30,11 +30,11 @@ logging.basicConfig(
 )
 
 app = FastAPI(
-    title="AI Research Assistant",
+    title="Neura",
     description=(
-        "Statistical analysis and Results-section writing assistant. "
-        "AI proposes; a human confirms every judgment call; nothing is "
-        "treated as fact until the sandbox or a human has verified it."
+        "Neura — the smart research assistant. AI proposes; a human confirms "
+        "every judgment call; nothing is treated as fact until the sandbox or a "
+        "human has verified it."
     ),
     version="1.0.0",
 )
@@ -73,13 +73,13 @@ def _startup() -> None:
     init_db()
     for sub in ("uploads", "artifacts", "outputs"):
         os.makedirs(os.path.join(settings.data_dir, sub), exist_ok=True)
-    logging.getLogger("app").info("AI Research Assistant %s started", app.version)
+    logging.getLogger("app").info("Neura %s started", app.version)
 
 
 @app.get("/")
 def root():
     return {
-        "name": "AI Research Assistant",
+        "name": "Neura",
         "version": app.version,
         "docs": "/docs",
     }

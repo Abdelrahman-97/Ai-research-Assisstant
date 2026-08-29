@@ -16,4 +16,4 @@ def test_health():
 def test_root():
     resp = client.get("/")
     assert resp.status_code == 200
-    assert resp.json()["name"] == "AI Research Assistant"
+    assert resp.json()["name"] == "Neura"
