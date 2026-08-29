@@ -149,4 +149,16 @@ pre.code {
 .toast.err { background: var(--err); }
 
 .link { color: var(--accent); cursor: pointer; text-decoration: underline; background: none; border: none; font: inherit; padding: 0; }
+
+/* Floating WhatsApp "Chat with us" button */
+.wa-fab {
+  position: fixed; right: 20px; bottom: 20px; z-index: 200;
+  display: inline-flex; align-items: center; gap: 8px;
+  background: #25D366; color: #fff; text-decoration: none;
+  padding: 12px 18px; border-radius: 999px; font-weight: 650; font-size: 14px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.22); transition: transform .15s, box-shadow .15s;
+}
+.wa-fab:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.28); }
+.wa-fab svg { display: block; }
+@media (max-width: 520px) { .wa-fab span { display: none; } .wa-fab { padding: 14px; } }
 .muted-note { font-size: 13px; color: var(--muted); margin-top: 12px; }
