@@ -98,6 +98,13 @@ class Settings(BaseSettings):
     price_per_1000_words_egp: int = 100   # per 1000 words of Results text
     price_per_1000_cells_egp: int = 20    # per 1000 data cells (rows x cols)
 
+    # --- Analyst assistant (free-text control layer) ---
+    assistant_enabled: bool = True
+    assistant_model: str = ""             # falls back to llm_model if empty
+    assistant_max_message_chars: int = 4000
+    # Default interaction tier when the user doesn't pick one.
+    assistant_default_tier: str = "basic"
+
     # Storage retention: inputs + outputs kept this many days after acceptance.
     retention_days: int = 30
 
@@ -119,3 +126,28 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
+
+# --------------------------------------------------------------------------- #
+# Interaction (assistant) tiers.
+#
+# Each tier includes a number of analyst messages and adds a surcharge to the
+# quote. Chosen at the price-estimate step. Edit freely to reprice — order here
+# is the order shown to the user; the first is the default/free tier.
+# --------------------------------------------------------------------------- #
+ASSISTANT_TIERS: dict[str, dict] = {
+    "basic":    {"label": "Basic",    "messages": 8,   "extra_egp": 0,
+                 "blurb": "Edit the plan and ask a few questions."},
+    "standard": {"label": "Standard", "messages": 25,  "extra_egp": 150,
+                 "blurb": "Refine tests, re-run, and iterate comfortably."},
+    "pro":      {"label": "Pro",      "messages": 80,  "extra_egp": 400,
+                 "blurb": "Heavy back-and-forth and multiple analyses."},
+}
+
+
+def get_tier(name: str | None) -> dict:
+    """Return a tier config by name, falling back to the default tier."""
+    return ASSISTANT_TIERS.get(
+        name or settings.assistant_default_tier,
+        ASSISTANT_TIERS[settings.assistant_default_tier],
+    )

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import math
 
-from app.config import settings
+from app.config import get_tier, settings
 from app.models.schemas import DataSummary, PriceQuote, Scope
 from app.services.llm_client import LLMClient, LLMError
 
@@ -108,6 +108,7 @@ def quote(
     data_summary: DataSummary | None,
     n_tests: int,
     word_count: int,
+    assistant_tier: str = "basic",
 ) -> PriceQuote:
     """Build a price quote with a transparent breakdown."""
     base = (
@@ -121,13 +122,22 @@ def quote(
     cells = (data_summary.n_rows * data_summary.n_cols) if data_summary else 0
     data_cost = math.ceil(cells / 1000) * settings.price_per_1000_cells_egp
 
+    tier = get_tier(assistant_tier)
+    tier_name = assistant_tier if assistant_tier in {"basic", "standard", "pro"} else settings.assistant_default_tier
+    assistant_cost = int(tier["extra_egp"])
+
     breakdown = {
         f"base ({scope.value})": base,
         f"tests (x{n_tests})": tests_cost,
         f"words ({word_count})": words_cost,
         f"data ({cells} cells)": data_cost,
     }
-    total = base + tests_cost + words_cost + data_cost
+    # Only show the interaction line when it carries a charge (keeps the free
+    # tier's breakdown clean).
+    if assistant_cost:
+        breakdown[f"interaction ({tier['label']})"] = assistant_cost
+
+    total = base + tests_cost + words_cost + data_cost + assistant_cost
     customer_total = (
         gross_up_for_fees(total) if settings.easykash_pass_fees_to_customer else total
     )
@@ -137,4 +147,6 @@ def quote(
         breakdown=breakdown,
         estimated_tests=n_tests,
         word_count=word_count,
+        assistant_tier=tier_name,
+        assistant_allowance=int(tier["messages"]),
     )

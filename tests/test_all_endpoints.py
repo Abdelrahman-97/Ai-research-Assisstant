@@ -11,8 +11,8 @@ from fastapi.testclient import TestClient
 
 from app.config import settings
 from app.main import app
-from app.models.schemas import ProposedTest
-from app.services import planner, pricing, results_writer, stats_executor
+from app.models.schemas import AssistantAction, ProposedTest
+from app.services import assistant, planner, pricing, results_writer, stats_executor
 
 client = TestClient(app)
 
@@ -41,6 +41,8 @@ def _stub(monkeypatch, tmp_path):
     monkeypatch.setattr(planner, "propose_plan", lambda **k: FAKE_PLAN)
     monkeypatch.setattr(stats_executor, "generate_script", lambda **k: REAL_SCRIPT)
     monkeypatch.setattr(results_writer, "write_results", lambda **k: "## Results\n\nDone.")
+    monkeypatch.setattr(assistant, "interpret",
+                        lambda run, message, **k: ("Sure.", AssistantAction(type="none")))
 
 
 def test_every_endpoint(tmp_path):
@@ -83,6 +85,10 @@ def test_every_endpoint(tmp_path):
     hit.add("/runs/{run_id}/pay-link")
     assert client.post("/payments/callback", json={"reference": ref, "status": "success"}).status_code == 200
     hit.add("/payments/callback")
+
+    # analyst assistant (paid run required) — stubbed interpret, no real LLM call
+    asst = client.post(f"/runs/{run_id}/assistant", headers=auth, json={"message": "hi"})
+    assert asst.status_code == 200; hit.add("/runs/{run_id}/assistant")
 
     assert client.post(f"/runs/{run_id}/plan", headers=auth).status_code == 200; hit.add("/runs/{run_id}/plan")
     assert client.post(f"/runs/{run_id}/approve", headers=auth, json={"confirmed": True}).status_code == 200

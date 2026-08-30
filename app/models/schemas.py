@@ -151,6 +151,10 @@ class EstimateRequest(BaseModel):
     """User-supplied inputs for the price estimate (word count is user-chosen)."""
 
     word_count: int = Field(..., ge=100, le=20000, description="Target words for the Results section")
+    assistant_tier: str = Field(
+        default="basic",
+        description="Interaction tier: how many assistant messages are included.",
+    )
 
 
 class PriceQuote(BaseModel):
@@ -161,6 +165,8 @@ class PriceQuote(BaseModel):
     breakdown: dict[str, int] = Field(default_factory=dict)
     estimated_tests: int = 0
     word_count: int = 0
+    assistant_tier: str = "basic"        # chosen interaction tier
+    assistant_allowance: int = 0         # assistant messages included by that tier
 
 
 # --------------------------------------------------------------------------- #
@@ -242,6 +248,54 @@ class ExecutionResult(BaseModel):
     artifacts: list[Artifact] = Field(default_factory=list)
 
 
+# --------------------------------------------------------------------------- #
+# Analyst assistant (free-text control layer over the pipeline)
+# --------------------------------------------------------------------------- #
+class Analysis(BaseModel):
+    """One statistical analysis within a run (a test + its script + its output).
+
+    A run always has a primary analysis (the fields on Run itself). The assistant
+    can add extra analyses here so one job can cover several tests.
+    """
+
+    test: ProposedTest
+    language: Language = Language.python
+    script: str | None = None
+    execution: ExecutionResult | None = None
+
+
+class AssistantAction(BaseModel):
+    """A structured operation the analyst layer maps a free-text request to.
+
+    The model may only emit these whitelisted types; the backend validates each
+    against the run's state before applying it. `type == "none"` is a pure reply
+    (explanation / clarification) with no side effect.
+    """
+
+    type: str = "none"          # none|explain|set_test|edit_variables|set_word_count|
+                                # regenerate_script|run_analysis|write_results|
+                                # filter_data|add_test
+    params: dict = Field(default_factory=dict)
+
+
+class ChatMessage(BaseModel):
+    role: str                    # "user" | "assistant"
+    content: str
+    action: AssistantAction | None = None
+    created_at: datetime = Field(default_factory=_now)
+
+
+class AssistantRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=4000)
+
+
+class AssistantResponse(BaseModel):
+    reply: str
+    action: AssistantAction | None = None
+    remaining: int = 0           # assistant messages left in the allowance
+    run: "Run"
+
+
 class Run(BaseModel):
     """The full state of one analysis job, moved through the pipeline."""
 
@@ -270,6 +324,16 @@ class Run(BaseModel):
     script: str | None = None
     execution: ExecutionResult | None = None
 
+    # extra analyses added via the assistant (the primary test stays in the
+    # fields above; these are additional tests so one run can cover several)
+    additional_analyses: list[Analysis] = Field(default_factory=list)
+
+    # analyst conversation + interaction allowance
+    messages: list[ChatMessage] = Field(default_factory=list)
+    assistant_tier: str = "basic"
+    assistant_allowance: int = 0
+    assistant_used: int = 0
+
     # outputs
     results_markdown: str | None = None
     docx_path: str | None = None
@@ -284,3 +348,7 @@ class Run(BaseModel):
     error: str | None = None
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)
+
+
+# Resolve the forward reference in AssistantResponse now that Run is defined.
+AssistantResponse.model_rebuild()

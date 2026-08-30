@@ -19,6 +19,8 @@ from app.api.deps import get_current_user
 from app.config import settings
 from app.ratelimit import limiter
 from app.models.schemas import (
+    AssistantRequest,
+    AssistantResponse,
     CreateRunRequest,
     EstimateRequest,
     Language,
@@ -27,7 +29,7 @@ from app.models.schemas import (
     TestConfirmation,
     User,
 )
-from app.services import cleanup, orchestrator, payments
+from app.services import assistant, cleanup, orchestrator, payments
 from app.services.llm_client import LLMError
 from app.services.orchestrator import PipelineError
 from app.store import blobs, repository
@@ -135,7 +137,7 @@ def estimate(
 ) -> Run:
     """Free: compute the price from scope, data, estimated tests, and word count."""
     run = _get_owned_run(run_id, user)
-    return _guard(lambda: orchestrator.estimate(run, body.word_count))
+    return _guard(lambda: orchestrator.estimate(run, body.word_count, body.assistant_tier))
 
 
 @router.post("/{run_id}/pay-link", response_model=PaymentLink)
@@ -192,6 +194,41 @@ def execute(run_id: str, user: User = Depends(get_current_user)) -> Run:
 def write_results(run_id: str, user: User = Depends(get_current_user)) -> Run:
     run = _get_owned_run(run_id, user)
     return _guard(lambda: orchestrator.write_results(run))
+
+
+@router.post("/{run_id}/assistant", response_model=AssistantResponse)
+@limiter.limit("30/minute")
+def talk_to_assistant(
+    request: Request,
+    run_id: str,
+    body: AssistantRequest,
+    user: User = Depends(get_current_user),
+) -> AssistantResponse:
+    """Free-text analyst layer: interpret the message, act on the run, reply.
+
+    Requires the run to be paid (the interaction allowance is part of the job).
+    """
+    run = _get_owned_run(run_id, user)
+    if not run.paid:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Pay for the run before using the assistant.",
+        )
+    try:
+        reply, action = assistant.respond(run, body.message)
+    except assistant.AssistantError as exc:
+        # Allowance exhausted / disabled — surface as a normal chat reply, not an error.
+        return AssistantResponse(
+            reply=str(exc), action=None, remaining=assistant.remaining(run), run=run
+        )
+    except LLMError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The AI service is temporarily unavailable. Please try again in a moment.",
+        ) from exc
+    return AssistantResponse(
+        reply=reply, action=action, remaining=assistant.remaining(run), run=run
+    )
 
 
 @router.post("/{run_id}/accept", response_model=Run)

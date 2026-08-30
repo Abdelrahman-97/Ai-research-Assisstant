@@ -76,8 +76,8 @@ def ingest(run: Run, protocol_text: str, data_path: str) -> Run:
     return _touch(run)
 
 
-def estimate(run: Run, word_count: int) -> Run:
-    """Step 2 (free): estimate the price from scope, data, tests, and word count."""
+def estimate(run: Run, word_count: int, assistant_tier: str = "basic") -> Run:
+    """Step 2 (free): estimate the price from scope, data, tests, words, tier."""
     if run.status not in (RunStatus.uploaded, RunStatus.awaiting_payment):
         raise PipelineError("Upload valid data before requesting a price estimate.")
 
@@ -87,8 +87,12 @@ def estimate(run: Run, word_count: int) -> Run:
         data_summary=run.data_summary,
         n_tests=n_tests,
         word_count=word_count,
+        assistant_tier=assistant_tier,
     )
     run.quote = quote
+    # Lock in the interaction allowance for this run from the chosen tier.
+    run.assistant_tier = quote.assistant_tier
+    run.assistant_allowance = quote.assistant_allowance
     run.status = RunStatus.awaiting_payment
     return _touch(run)
 
@@ -159,6 +163,14 @@ def generate_script(run: Run, language: Language) -> Run:
         data_filename=data_filename,
         language=language,
     )
+    # Also (re)generate scripts for any extra analyses added via the assistant.
+    for analysis in run.additional_analyses:
+        analysis.language = language
+        analysis.script = stats_executor.generate_script(
+            test=analysis.test,
+            data_filename=data_filename,
+            language=language,
+        )
     run.status = RunStatus.script_ready
     return _touch(run)
 
@@ -194,6 +206,14 @@ def run_script(run: Run) -> Run:
         run.error = execution.stderr or "Script execution failed."
         return _touch(run)
 
+    # Run any additional analyses too. One failing extra test doesn't fail the run
+    # — its failure is recorded and simply omitted from the Results.
+    for analysis in run.additional_analyses:
+        if analysis.script:
+            analysis.execution = stats_executor.execute(
+                analysis.script, analysis.language, run.data_path
+            )
+
     run.status = RunStatus.executed
     run.error = None
     return _touch(run)
@@ -218,11 +238,29 @@ def write_results(run: Run) -> Run:
         ev_md = evidence.to_markdown(run.approved_test.evidence, run.approved_test.name)
         if ev_md:
             markdown = f"{markdown}\n\n{ev_md}"
+
+        # Collect artifacts from every analysis for the documents.
+        all_artifacts = list(run.execution.artifacts)
+
+        # Append a section per additional analysis that ran successfully.
+        for analysis in run.additional_analyses:
+            ex = analysis.execution
+            if not ex or ex.status != RunStatus.executed:
+                continue
+            section = results_writer.write_results(
+                test=analysis.test, execution=ex, scope=run.scope
+            )
+            ev2 = evidence.to_markdown(analysis.test.evidence, analysis.test.name)
+            markdown = f"{markdown}\n\n---\n\n## Additional analysis — {analysis.test.name}\n\n{section}"
+            if ev2:
+                markdown = f"{markdown}\n\n{ev2}"
+            all_artifacts.extend(ex.artifacts)
+
         out_dir = Path(settings.data_dir) / "outputs"
         docx_path = out_dir / f"results_{run.id}.docx"
         pdf_path = out_dir / f"results_{run.id}.pdf"
-        report_writer.markdown_to_docx(markdown, run.execution.artifacts, docx_path)
-        report_writer.markdown_to_pdf(markdown, run.execution.artifacts, pdf_path)
+        report_writer.markdown_to_docx(markdown, all_artifacts, docx_path)
+        report_writer.markdown_to_pdf(markdown, all_artifacts, pdf_path)
         # Persist outputs to the shared blob store: durable across redeploys and
         # reachable by the API when the worker is what generated them.
         run.docx_blob_id = blobs.put(
