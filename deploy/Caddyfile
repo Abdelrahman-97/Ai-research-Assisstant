@@ -1,0 +1,14 @@
+# Caddy reverse proxy with automatic HTTPS (Let's Encrypt).
+#
+# {$API_DOMAIN} is filled from deploy/.env. It can be either:
+#   - a real domain you point at the server, e.g.  api.yourdomain.com
+#   - a free auto-hostname for the server IP,  e.g.  203-0-113-5.sslip.io
+#     (sslip.io resolves <dashed-ip>.sslip.io -> that IP, so Caddy can still
+#      obtain a valid certificate before you own a domain).
+#
+# Caddy fetches and renews the TLS certificate automatically — nothing else to do.
+
+{$API_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy api:8000
+}

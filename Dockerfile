@@ -5,9 +5,9 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System deps kept minimal; add build tools only if a wheel needs compiling.
+# System deps: gcc for any source builds, libgomp1 for scipy/statsmodels (OpenMP).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends gcc \
+    && apt-get install -y --no-install-recommends gcc libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
