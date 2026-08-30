@@ -272,6 +272,33 @@ function runShell(inner) {
       <h1 style="margin-top:10px;">${labelScope(r.scope)} · Results section</h1>
       ${stepper(r.status)}
       ${inner}
+    </div>
+    ${assistantPanel(r)}`;
+}
+
+/* --- Analyst assistant panel (persistent across the whole run) --- */
+function assistantPanel(r) {
+  if (!r.paid) return "";                 // available once the job is paid
+  const remaining = Math.max(0, (r.assistant_allowance || 0) - (r.assistant_used || 0));
+  const msgs = (r.messages || []).map(m => `
+    <div class="asst-msg asst-${m.role}">
+      <div class="asst-bubble">${esc(m.content)}</div>
+    </div>`).join("");
+  const empty = (r.messages || []).length === 0
+    ? `<p class="sub" style="padding:8px 4px;">Ask me to change the test, adjust variables, filter the data, re-run, add another analysis, or explain a result — in plain language.</p>`
+    : "";
+  const disabled = remaining <= 0;
+  return `
+    <div class="card asst-card">
+      <div class="asst-head">
+        <strong>Your analyst</strong>
+        <span class="asst-remaining">${remaining} message${remaining === 1 ? "" : "s"} left</span>
+      </div>
+      <div class="asst-log" id="asstLog">${empty}${msgs}</div>
+      <div class="asst-input">
+        <textarea id="asstText" rows="2" placeholder="${disabled ? "You've used all your assistant messages for this job." : "Message your analyst…"}" ${disabled ? "disabled" : ""}></textarea>
+        <button id="asstSend" class="btn btn-primary" ${disabled ? "disabled" : ""}>Send</button>
+      </div>
     </div>`;
 }
 
@@ -327,6 +354,13 @@ function viewEstimate() {
     <div>${cols}</div>
     <label style="margin-top:18px;">Target word count for the Results section</label>
     <input id="wordCount" type="number" min="100" max="20000" step="50" value="800" />
+    <label style="margin-top:18px;">Interaction with your analyst</label>
+    <p class="sub" style="margin-top:2px;">How much you can chat to refine the plan, re-run, or add analyses.</p>
+    <select id="assistantTier">
+      <option value="basic" selected>Basic — a few messages, included</option>
+      <option value="standard">Standard — comfortable back-and-forth (+150 EGP)</option>
+      <option value="pro">Pro — heavy iteration & multiple analyses (+400 EGP)</option>
+    </select>
     <div class="btn-row"><button id="estimateBtn" class="btn btn-primary">Get price</button></div>`;
 }
 function viewPay() {
@@ -473,7 +507,9 @@ function bindRunHandlers() {
   const estimateBtn = document.getElementById("estimateBtn");
   if (estimateBtn) estimateBtn.onclick = () => step("estimateBtn", async () => {
     const wc = parseInt(document.getElementById("wordCount").value, 10);
-    state.run = await api(`/runs/${r.id}/estimate`, { method: "POST", body: { word_count: wc } });
+    const tierEl = document.getElementById("assistantTier");
+    const assistant_tier = tierEl ? tierEl.value : "basic";
+    state.run = await api(`/runs/${r.id}/estimate`, { method: "POST", body: { word_count: wc, assistant_tier } });
     render();
   });
 
@@ -559,6 +595,28 @@ function bindRunHandlers() {
   if (dlWord) dlWord.onclick = () => downloadDoc("word");
   const dlPdf = document.getElementById("dlPdf");
   if (dlPdf) dlPdf.onclick = () => downloadDoc("pdf");
+
+  // Analyst assistant: send a free-text message, apply the returned run state.
+  const asstSend = document.getElementById("asstSend");
+  const asstText = document.getElementById("asstText");
+  if (asstSend && asstText) {
+    const send = () => {
+      const msg = asstText.value.trim();
+      if (!msg) return;
+      step("asstSend", async () => {
+        const res = await api(`/runs/${r.id}/assistant`, { method: "POST", body: { message: msg } });
+        state.run = res.run;       // may have changed status/test/data via an action
+        render();                  // re-renders the whole run screen + panel
+      });
+    };
+    asstSend.onclick = send;
+    asstText.onkeydown = (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+    };
+    // keep the latest messages in view
+    const log = document.getElementById("asstLog");
+    if (log) log.scrollTop = log.scrollHeight;
+  }
 }
 
 async function pollForResults(id) {

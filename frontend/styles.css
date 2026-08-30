@@ -221,3 +221,34 @@ pre.code {
   .tag { background: #20242d; }
   .site-footer a { color: var(--muted); }
 }
+
+/* --- Analyst assistant panel --- */
+.asst-card { margin-top: 16px; }
+.asst-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.asst-remaining { color: var(--muted); font-size: 13px; }
+.asst-log {
+  max-height: 320px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 4px; margin-bottom: 12px;
+}
+.asst-msg { display: flex; }
+.asst-user { justify-content: flex-end; }
+.asst-assistant { justify-content: flex-start; }
+.asst-bubble {
+  max-width: 82%; padding: 9px 13px; border-radius: 14px;
+  font-size: 14.5px; line-height: 1.5; white-space: pre-wrap;
+  border: 1px solid var(--line);
+}
+.asst-user .asst-bubble { background: var(--accent); color: #fff; border-color: var(--accent); }
+.asst-assistant .asst-bubble { background: var(--bg); color: var(--ink); }
+.asst-input { display: flex; gap: 8px; align-items: flex-end; }
+.asst-input textarea {
+  flex: 1; resize: vertical; min-height: 42px;
+  padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink);
+  font: inherit;
+}
+.asst-input .btn { white-space: nowrap; }
