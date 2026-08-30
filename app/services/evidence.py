@@ -151,11 +151,159 @@ _BASE: dict[str, dict] = {
         "assumptions": ["Unidimensional scale", "Tau-equivalent items"],
         "citation": "Cronbach, L. J. (1951). Coefficient alpha and the internal structure of tests. Psychometrika, 16(3), 297–334.",
     },
+    # ---------------- Extended parametric ----------------
+    "one_sample_t_test": {
+        "family": PARAMETRIC,
+        "when_to_use": "Compare a sample mean of a continuous outcome to a known or hypothesized value.",
+        "assumptions": ["Independence", "Approximate normality"],
+        "citation": "Student (1908). The probable error of a mean. Biometrika, 6(1), 1–25.",
+    },
+    "welch_anova": {
+        "family": PARAMETRIC,
+        "when_to_use": "Compare means across three or more groups when variances are unequal.",
+        "assumptions": ["Independence", "Normality", "Unequal variances allowed (does not assume homogeneity)"],
+        "citation": "Welch, B. L. (1951). On the comparison of several mean values: an alternative approach. Biometrika, 38(3/4), 330–336.",
+    },
+    "linear_mixed_model": {
+        "family": PARAMETRIC,
+        "when_to_use": "Model a continuous outcome with both fixed and random effects (clustered or repeated-measures data).",
+        "assumptions": ["Correct random-effects structure", "Normality of residuals and random effects"],
+        "citation": "Laird, N. M., & Ware, J. H. (1982). Random-effects models for longitudinal data. Biometrics, 38(4), 963–974.",
+    },
+    "gee": {
+        "family": PARAMETRIC,
+        "when_to_use": "Model correlated/clustered outcomes with population-averaged effects.",
+        "assumptions": ["Correct working correlation structure", "Large-sample inference"],
+        "citation": "Liang, K.-Y., & Zeger, S. L. (1986). Longitudinal data analysis using generalized linear models. Biometrika, 73(1), 13–22.",
+    },
+    "poisson_regression": {
+        "family": PARAMETRIC,
+        "when_to_use": "Model count outcomes as a function of predictors.",
+        "assumptions": ["Count outcome", "Mean equals variance (else use negative binomial)"],
+        "citation": "Nelder, J. A., & Wedderburn, R. W. M. (1972). Generalized linear models. Journal of the Royal Statistical Society A, 135(3), 370–384.",
+    },
+    "negative_binomial_regression": {
+        "family": PARAMETRIC,
+        "when_to_use": "Model over-dispersed count outcomes (variance greater than the mean).",
+        "assumptions": ["Count outcome", "Over-dispersion"],
+        "citation": "Nelder, J. A., & Wedderburn, R. W. M. (1972). Generalized linear models. Journal of the Royal Statistical Society A, 135(3), 370–384.",
+    },
+    # ---------------- Extended non-parametric ----------------
+    "mcnemar": {
+        "family": NONPARAMETRIC,
+        "when_to_use": "Compare paired binary outcomes (e.g. before/after on the same subjects).",
+        "assumptions": ["Paired binary data"],
+        "citation": "McNemar, Q. (1947). Note on the sampling error of the difference between correlated proportions or percentages. Psychometrika, 12(2), 153–157.",
+    },
+    "cochran_q": {
+        "family": NONPARAMETRIC,
+        "when_to_use": "Compare three or more paired binary outcomes on the same subjects.",
+        "assumptions": ["Repeated binary measures on the same subjects"],
+        "citation": "Cochran, W. G. (1950). The comparison of percentages in matched samples. Biometrika, 37(3/4), 256–266.",
+    },
+    "log_rank": {
+        "family": NONPARAMETRIC,
+        "when_to_use": "Compare survival (time-to-event) distributions between groups.",
+        "assumptions": ["Non-informative censoring", "Proportional hazards"],
+        "citation": "Mantel, N. (1966). Evaluation of survival data and two new rank order statistics arising in its consideration. Cancer Chemotherapy Reports, 50(3), 163–170.",
+    },
+    "kendall_tau": {
+        "family": NONPARAMETRIC,
+        "when_to_use": "Measure ordinal (rank-based) association between two variables.",
+        "assumptions": ["Ordinal or continuous variables"],
+        "citation": "Kendall, M. G. (1938). A new measure of rank correlation. Biometrika, 30(1/2), 81–93.",
+    },
+    "two_proportion_z": {
+        "family": NONPARAMETRIC,
+        "when_to_use": "Compare two independent proportions.",
+        "assumptions": ["Independence", "Large enough samples (np and n(1−p) ≥ 5)"],
+        "citation": "Fleiss, J. L., Levin, B., & Paik, M. C. (2003). Statistical Methods for Rates and Proportions (3rd ed.). Wiley.",
+    },
+    # ---------------- Extended assumption checks / post-hoc / agreement ----------------
+    "kolmogorov_smirnov": {
+        "family": OTHER,
+        "when_to_use": "Test whether a sample follows a specified distribution (goodness of fit).",
+        "assumptions": ["Independent observations", "Continuous distribution"],
+        "citation": "Massey, F. J. (1951). The Kolmogorov–Smirnov test for goodness of fit. JASA, 46(253), 68–78.",
+    },
+    "bartlett": {
+        "family": OTHER,
+        "when_to_use": "Test equality of variances across groups (normal-theory).",
+        "assumptions": ["Normality"],
+        "citation": "Bartlett, M. S. (1937). Properties of sufficiency and statistical tests. Proceedings of the Royal Society A, 160(901), 268–282.",
+    },
+    "mauchly": {
+        "family": OTHER,
+        "when_to_use": "Test the sphericity assumption in repeated-measures ANOVA.",
+        "assumptions": ["Multivariate normality"],
+        "citation": "Mauchly, J. W. (1940). Significance test for sphericity of a normal n-variate distribution. Annals of Mathematical Statistics, 11(2), 204–209.",
+    },
+    "tukey_hsd": {
+        "family": OTHER,
+        "when_to_use": "Post-hoc pairwise comparisons after a significant ANOVA (controls family-wise error).",
+        "assumptions": ["ANOVA assumptions", "Balanced designs preferred"],
+        "citation": "Tukey, J. W. (1949). Comparing individual means in the analysis of variance. Biometrics, 5(2), 99–114.",
+    },
+    "dunnett": {
+        "family": OTHER,
+        "when_to_use": "Post-hoc comparison of several treatment groups against a single control.",
+        "assumptions": ["ANOVA assumptions"],
+        "citation": "Dunnett, C. W. (1955). A multiple comparison procedure for comparing several treatments with a control. JASA, 50(272), 1096–1121.",
+    },
+    "bonferroni": {
+        "family": OTHER,
+        "when_to_use": "Adjust p-values for multiple comparisons (family-wise error control).",
+        "assumptions": ["Multiple hypothesis tests"],
+        "citation": "Dunn, O. J. (1961). Multiple comparisons among means. JASA, 56(293), 52–64.",
+    },
+    "icc": {
+        "family": OTHER,
+        "when_to_use": "Assess agreement/reliability of continuous measurements across raters or repeats.",
+        "assumptions": ["Appropriate ICC model and form chosen"],
+        "citation": "Shrout, P. E., & Fleiss, J. L. (1979). Intraclass correlations: uses in assessing rater reliability. Psychological Bulletin, 86(2), 420–428.",
+    },
+    "bland_altman": {
+        "family": OTHER,
+        "when_to_use": "Assess agreement between two measurement methods.",
+        "assumptions": ["Differences approximately normal", "Bias roughly constant across the range"],
+        "citation": "Bland, J. M., & Altman, D. G. (1986). Statistical methods for assessing agreement between two methods of clinical measurement. The Lancet, 327(8476), 307–310.",
+    },
 }
 
 # Alias phrases (lowercased, non-alphanumeric stripped) -> canonical key.
 # Ordered longest/most-specific first where it matters.
 _ALIASES: list[tuple[str, str]] = [
+    # --- specific multi-word aliases first (must beat generic single words) ---
+    ("welch anova", "welch_anova"),
+    ("one sample t", "one_sample_t_test"),
+    ("mixed effects", "linear_mixed_model"),
+    ("mixed model", "linear_mixed_model"),
+    ("multilevel", "linear_mixed_model"),
+    ("hierarchical linear", "linear_mixed_model"),
+    ("generalized estimating", "gee"),
+    ("negative binomial", "negative_binomial_regression"),
+    ("poisson", "poisson_regression"),
+    ("mcnemar", "mcnemar"),
+    ("cochran q", "cochran_q"),
+    ("cochrans q", "cochran_q"),
+    ("log rank", "log_rank"),
+    ("logrank", "log_rank"),
+    ("mantel", "log_rank"),
+    ("kendall", "kendall_tau"),
+    ("kolmogorov", "kolmogorov_smirnov"),
+    ("smirnov", "kolmogorov_smirnov"),
+    ("intraclass", "icc"),
+    ("bland altman", "bland_altman"),
+    ("tukey", "tukey_hsd"),
+    ("dunnett", "dunnett"),
+    ("bonferroni", "bonferroni"),
+    ("two proportion", "two_proportion_z"),
+    ("proportion z", "two_proportion_z"),
+    ("bartlett", "bartlett"),
+    ("mauchly", "mauchly"),
+    ("gee", "gee"),
+    ("icc", "icc"),
+    # --- original set ---
     ("independent samples t", "independent_t_test"),
     ("independent t", "independent_t_test"),
     ("unpaired t", "independent_t_test"),
@@ -196,7 +344,10 @@ _ALIASES: list[tuple[str, str]] = [
 
 
 def _normalize(text: str) -> str:
-    return re.sub(r"[^a-z0-9 ]", " ", text.lower())
+    t = text.lower().replace("’", "'")   # curly apostrophe -> straight
+    t = t.replace("'s", " ").replace("'", " ")  # drop possessives (Welch's -> welch)
+    t = re.sub(r"[^a-z0-9 ]", " ", t)
+    return re.sub(r"\s+", " ", t).strip()
 
 
 def lookup(test_name: str) -> TestEvidence:
