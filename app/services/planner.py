@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 
 from app.models.schemas import DataSummary, ProposedTest, Scope
+from app.services import evidence
 from app.services.llm_client import LLMClient
 
 _SYSTEM = (
@@ -72,4 +73,7 @@ def propose_plan(
             {"role": "user", "content": user_prompt},
         ]
     )
-    return ProposedTest(**payload)
+    test = ProposedTest(**payload)
+    # Attach reliable, curated methodological evidence (real citation + assumptions).
+    evidence.attach(test)
+    return test

@@ -35,6 +35,7 @@ from app.models.schemas import (
     TestConfirmation,
 )
 from app.services import (
+    evidence,
     integrity_checker,
     planner,
     pricing,
@@ -133,6 +134,9 @@ def approve_plan(run: Run, confirmation: TestConfirmation) -> Run:
         )
 
     run.approved_test = confirmation.edited_plan or run.proposed_test
+    # Re-attach curated evidence in case the user edited the test choice.
+    if run.approved_test is not None:
+        evidence.attach(run.approved_test)
     run.status = RunStatus.approved
     return _touch(run)
 
@@ -195,6 +199,10 @@ def write_results(run: Run) -> Run:
             execution=run.execution,
             scope=run.scope,
         )
+        # Append the reliable, curated methodological evidence (real citation).
+        ev_md = evidence.to_markdown(run.approved_test.evidence, run.approved_test.name)
+        if ev_md:
+            markdown = f"{markdown}\n\n{ev_md}"
         out_dir = Path(settings.data_dir) / "outputs"
         docx_path = out_dir / f"results_{run.id}.docx"
         pdf_path = out_dir / f"results_{run.id}.pdf"

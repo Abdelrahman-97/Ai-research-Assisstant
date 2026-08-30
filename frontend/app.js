@@ -361,6 +361,21 @@ function viewStartPlan() {
 }
 function viewPlan() {
   const t = state.run.proposed_test || {};
+  const ev = t.evidence;
+  let evHtml = "";
+  if (ev && ev.matched) {
+    const assumptions = (ev.assumptions || []).map(a => `<li>${esc(a)}</li>`).join("");
+    evHtml = `
+    <div class="card" style="background:#EEF0FF;border-color:var(--accent);margin-top:16px;">
+      <strong>📖 Evidence for this test</strong>
+      ${ev.family ? `<span class="pill ok" style="margin-left:6px;">${esc(ev.family)}</span>` : ""}
+      ${ev.when_to_use ? `<p class="sub" style="margin:8px 0 4px;">${esc(ev.when_to_use)}</p>` : ""}
+      ${assumptions ? `<div style="font-size:13px;"><strong>Assumptions:</strong><ul style="margin:4px 0 0 18px;">${assumptions}</ul></div>` : ""}
+      ${ev.citation ? `<p class="muted-note" style="margin-top:8px;"><strong>Reference:</strong> ${esc(ev.citation)}</p>` : ""}
+    </div>`;
+  } else if (ev) {
+    evHtml = `<p class="muted-note" style="margin-top:12px;">📖 ${esc(ev.note || "No curated reference — verify the method manually.")}</p>`;
+  }
   return `
     <h2>Proposed plan — your approval needed</h2>
     <p class="sub">Review the AI's proposal. Approve it, or edit before continuing. Nothing runs until you approve.</p>
@@ -370,7 +385,7 @@ function viewPlan() {
     <textarea id="pReason">${esc(t.reasoning || "")}</textarea>
     <label>Variables (comma-separated)</label>
     <input id="pVars" value="${esc((t.variables || []).join(", "))}" />
-    <div>${(t.assumptions || []).map(a => `<span class="tag">assumes: ${esc(a)}</span>`).join("")}</div>
+    ${evHtml}
     <div class="btn-row">
       <button id="approveBtn" class="btn btn-primary">Approve & continue</button>
     </div>`;

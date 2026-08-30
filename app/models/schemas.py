@@ -185,6 +185,22 @@ class IntegrityReport(BaseModel):
     summary: DataSummary | None = None
 
 
+class TestEvidence(BaseModel):
+    """Reliable, curated methodological evidence for a statistical test.
+
+    Sourced from a fixed in-app reference base (NOT the LLM), so the citation is
+    always real and verifiable — never hallucinated.
+    """
+
+    matched: bool = False                      # True if found in the curated base
+    canonical_name: str | None = None          # normalized test name we matched
+    family: str | None = None                  # "parametric" | "non-parametric" | other
+    when_to_use: str | None = None             # one-line rationale for this design
+    assumptions: list[str] = Field(default_factory=list)
+    citation: str | None = None                # canonical reference (e.g. Student, 1908)
+    note: str | None = None                    # e.g. "no curated reference — verify manually"
+
+
 class ProposedTest(BaseModel):
     """A statistical test the AI proposes, with citable reasoning."""
 
@@ -195,6 +211,7 @@ class ProposedTest(BaseModel):
     )
     assumptions: list[str] = Field(default_factory=list)
     citations: list[str] = Field(default_factory=list)
+    evidence: TestEvidence | None = None       # attached from the curated base
 
 
 class TestConfirmation(BaseModel):
