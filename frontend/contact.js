@@ -8,9 +8,16 @@
   var greeting = encodeURIComponent("Hi! I need help with Neura.");
   var waLink = wa ? "https://wa.me/" + wa + "?text=" + greeting : null;
 
-  // Fill inline contact links (footers, policy pages).
+  // Fill inline contact links (footers, policy pages). When no email is set yet
+  // (before the domain mailbox exists), hide the link and its trailing separator
+  // so there's no dead "email" link on the page.
   document.querySelectorAll(".js-support-email").forEach(function (el) {
-    if (!email) return;
+    if (!email) {
+      el.style.display = "none";
+      var sib = el.nextSibling;              // the " · " / " &middot; " separator
+      if (sib && sib.nodeType === 3) sib.textContent = " ";
+      return;
+    }
     el.textContent = email;
     if (el.tagName === "A") el.href = "mailto:" + email;
   });
