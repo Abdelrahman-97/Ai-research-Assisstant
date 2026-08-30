@@ -1,6 +1,12 @@
 """Security helpers: password hashing and signed tokens.
 
-Passwords are hashed with bcrypt (via passlib) — we never store plaintext.
+Passwords are hashed with bcrypt — we never store plaintext. We call the `bcrypt`
+library directly rather than through passlib: passlib is unmaintained and its
+bcrypt backend crashes to initialize against modern bcrypt (4.x) / Python 3.13+.
+
+bcrypt only considers the first 72 bytes of a password and newer versions raise
+on longer input, so we truncate to 72 bytes before hashing and verifying (doing
+it in both places keeps them consistent).
 
 Two kinds of JWT are issued:
   - access tokens: carry the user id (`sub`) and a token version (`tv`). Bumping
@@ -13,20 +19,26 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
 import jwt
-from passlib.context import CryptContext
 
 from app.config import settings
 
-_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def _pw_bytes(password: str) -> bytes:
+    # bcrypt uses at most the first 72 bytes; encode then truncate to stay within it.
+    return password.encode("utf-8")[:72]
 
 
 def hash_password(password: str) -> str:
-    return _pwd.hash(password)
+    return bcrypt.hashpw(_pw_bytes(password), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(password: str, password_hash: str) -> bool:
-    return _pwd.verify(password, password_hash)
+    try:
+        return bcrypt.checkpw(_pw_bytes(password), password_hash.encode("utf-8"))
+    except (ValueError, TypeError):
+        return False
 
 
 def _encode(payload: dict, minutes: int) -> str:

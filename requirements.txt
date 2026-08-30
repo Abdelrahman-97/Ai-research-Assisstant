@@ -10,7 +10,7 @@ python-dotenv
 email-validator     # EmailStr validation
 
 # --- Auth ---
-passlib[bcrypt]     # password hashing
+bcrypt              # password hashing (used directly; passlib is unmaintained)
 pyjwt               # JWT access tokens
 
 # --- Security ---
