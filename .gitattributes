@@ -1,0 +1,23 @@
+# Normalize line endings. The repo stores text as LF; this stops Git on Windows
+# from rewriting them to CRLF (which silences the "LF will be replaced by CRLF"
+# warnings) and, importantly, keeps files that run on Linux (Render) correct.
+* text=auto eol=lf
+
+# Shell scripts and Dockerfiles MUST stay LF or they break on Linux.
+*.sh    text eol=lf
+*.py    text eol=lf
+Dockerfile      text eol=lf
+docker/Dockerfile.sandbox text eol=lf
+
+# Windows batch files stay CRLF.
+*.bat   text eol=crlf
+
+# Binary assets — never touch line endings.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.xlsx  binary
+*.xls   binary
