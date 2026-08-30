@@ -41,6 +41,17 @@ class Settings(BaseSettings):
     # harness so it runs without building the sandbox image). Dev only.
     sandbox_force_subprocess: bool = False
 
+    # Execution mode:
+    #   "inline"  — /execute runs the script synchronously in the API process
+    #               (default; used by dev + the whole test suite).
+    #   "worker"  — /execute only enqueues the run; a separate background worker
+    #               service picks it up, runs it, writes the results, and marks
+    #               it completed. This is the production topology on Render.
+    execution_mode: str = "inline"
+    # How often the worker polls the queue, and how many runs it claims per pass.
+    worker_poll_seconds: float = 5.0
+    worker_batch: int = 1
+
     # Auth (JWT)
     jwt_secret: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"

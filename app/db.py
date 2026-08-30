@@ -11,7 +11,15 @@ from __future__ import annotations
 
 import os
 
-from sqlalchemy import Column, String, Text, create_engine
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Index,
+    LargeBinary,
+    String,
+    Text,
+    create_engine,
+)
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -56,6 +64,26 @@ class RunRow(Base):
     id = Column(String, primary_key=True)
     user_id = Column(String, index=True, nullable=False)
     data = Column(Text, nullable=False)
+
+
+class BlobRow(Base):
+    """Binary file storage shared by the web and worker services.
+
+    Uploads, generated figures/tables, and the Word/PDF outputs are stored here
+    so the two Render services (which do NOT share a disk) can hand files back
+    and forth, and so files survive redeploys (durable 30-day retention).
+    """
+
+    __tablename__ = "blobs"
+    id = Column(String, primary_key=True)
+    run_id = Column(String, index=True, nullable=False)
+    kind = Column(String, nullable=False)      # 'upload' | 'artifact' | 'docx' | 'pdf'
+    filename = Column(String, nullable=False)
+    content = Column(LargeBinary, nullable=False)
+    created_at = Column(DateTime, nullable=True)
+
+
+Index("ix_blobs_run_kind", BlobRow.run_id, BlobRow.kind)
 
 
 def init_db() -> None:

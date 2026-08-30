@@ -13,7 +13,7 @@ from pathlib import Path
 from fastapi import (
     APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status,
 )
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from app.api.deps import get_current_user
 from app.config import settings
@@ -30,7 +30,7 @@ from app.models.schemas import (
 from app.services import cleanup, orchestrator, payments
 from app.services.llm_client import LLMError
 from app.services.orchestrator import PipelineError
-from app.store import repository
+from app.store import blobs, repository
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
@@ -116,6 +116,12 @@ async def upload(
                 )
             f.write(chunk)
 
+    # Persist the dataset to the shared blob store so the background worker (a
+    # separate service, no shared disk) can run the analysis against it, and so
+    # the file survives redeploys for the retention window.
+    run.data_blob_id = blobs.put(
+        run_id, kind="upload", filename=dest.name, content=dest.read_bytes()
+    )
     return orchestrator.ingest(run, protocol_text=protocol, data_path=str(dest))
 
 
@@ -174,6 +180,11 @@ def generate_script(
 @router.post("/{run_id}/execute", response_model=Run)
 def execute(run_id: str, user: User = Depends(get_current_user)) -> Run:
     run = _get_owned_run(run_id, user)
+    # In production the API doesn't run scripts itself: it enqueues the run for the
+    # isolated background worker (which runs the script AND writes the results).
+    # In inline mode it runs synchronously — used by dev and the test suite.
+    if settings.execution_mode == "worker":
+        return _guard(lambda: orchestrator.enqueue_execution(run))
     return _guard(lambda: orchestrator.run_script(run))
 
 
@@ -209,15 +220,27 @@ def download(
             detail="This run's files have expired (30-day storage window elapsed).",
         )
 
+    media = (
+        "application/pdf"
+        if format == "pdf"
+        else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+    filename = f"results_{run_id}.{'pdf' if format == 'pdf' else 'docx'}"
+
+    # Prefer the durable blob store (works even when the worker built the file on
+    # another service, and survives redeploys); fall back to the local disk path.
+    blob_id = run.pdf_blob_id if format == "pdf" else run.docx_blob_id
+    if blob_id:
+        got = blobs.get(blob_id)
+        if got:
+            return Response(content=got[1], media_type=media, headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            })
+
     path = run.pdf_path if format == "pdf" else run.docx_path
     if not path or not Path(path).exists():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No results document yet — complete the run first.",
         )
-    media = (
-        "application/pdf"
-        if format == "pdf"
-        else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    )
-    return FileResponse(path, media_type=media, filename=f"results_{run_id}.{'pdf' if format=='pdf' else 'docx'}")
+    return FileResponse(path, media_type=media, filename=filename)

@@ -18,13 +18,16 @@ from pathlib import Path
 
 from app.config import settings
 from app.models.schemas import Run, RunStatus
-from app.store import repository
+from app.store import blobs, repository
 
 log = logging.getLogger("app.cleanup")
 
 
 def _delete_run_files(run: Run) -> None:
-    """Remove this run's on-disk inputs and outputs."""
+    """Remove this run's inputs and outputs, on disk and in the blob store."""
+    # Durable copies in the shared blob store (uploads, artifacts, docx, pdf).
+    blobs.delete_for_run(run.id)
+
     # Uploaded data lives in data/uploads/<run_id>/
     upload_dir = Path(settings.data_dir) / "uploads" / run.id
     if upload_dir.exists():
@@ -71,6 +74,9 @@ def purge_expired(now: datetime | None = None) -> int:
         run.data_path = None
         run.docx_path = None
         run.pdf_path = None
+        run.data_blob_id = None
+        run.docx_blob_id = None
+        run.pdf_blob_id = None
         if run.execution:
             run.execution.artifacts = []
         run.updated_at = now

@@ -43,7 +43,7 @@ from app.services import (
     results_writer,
     stats_executor,
 )
-from app.store import repository
+from app.store import blobs, repository
 
 
 class PipelineError(RuntimeError):
@@ -163,10 +163,25 @@ def generate_script(run: Run, language: Language) -> Run:
     return _touch(run)
 
 
+def enqueue_execution(run: Run) -> Run:
+    """Step 5 (worker mode): hand the previewed script to the background worker.
+
+    Returns immediately with status `queued`; the worker runs the script and then
+    writes the results, so the client polls the run until it reaches `completed`
+    (or `failed`).
+    """
+    _require_paid(run)
+    if run.status not in (RunStatus.script_ready, RunStatus.queued) or not run.script or not run.language:
+        raise PipelineError("Generate a script before running it.")
+    run.status = RunStatus.queued
+    run.error = None
+    return _touch(run)
+
+
 def run_script(run: Run) -> Run:
     """Step 5: execute the previewed script in the sandbox."""
     _require_paid(run)
-    if run.status != RunStatus.script_ready or not run.script or not run.language:
+    if run.status not in (RunStatus.script_ready, RunStatus.queued) or not run.script or not run.language:
         raise PipelineError("Generate a script before running it.")
 
     run.status = RunStatus.executing
@@ -208,6 +223,14 @@ def write_results(run: Run) -> Run:
         pdf_path = out_dir / f"results_{run.id}.pdf"
         report_writer.markdown_to_docx(markdown, run.execution.artifacts, docx_path)
         report_writer.markdown_to_pdf(markdown, run.execution.artifacts, pdf_path)
+        # Persist outputs to the shared blob store: durable across redeploys and
+        # reachable by the API when the worker is what generated them.
+        run.docx_blob_id = blobs.put(
+            run.id, kind="docx", filename=docx_path.name, content=docx_path.read_bytes()
+        )
+        run.pdf_blob_id = blobs.put(
+            run.id, kind="pdf", filename=pdf_path.name, content=pdf_path.read_bytes()
+        )
     except Exception:
         # Revert so the user can retry writing without re-running the analysis.
         run.status = RunStatus.executed

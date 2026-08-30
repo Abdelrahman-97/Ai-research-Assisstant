@@ -66,7 +66,7 @@ const STEPS = [
 function statusToStepIndex(s) {
   return {
     created: 0, uploaded: 1, awaiting_payment: 2, paid: 3, awaiting_approval: 3,
-    approved: 4, script_ready: 4, executing: 5, executed: 5, writing: 6,
+    approved: 4, script_ready: 4, queued: 5, executing: 5, executed: 5, writing: 6,
     completed: 6, accepted: 6,
   }[s] ?? 0;
 }
@@ -286,6 +286,7 @@ function renderRun() {
     case "awaiting_approval": inner = viewPlan(); break;
     case "approved": inner = viewScriptGen(); break;
     case "script_ready": inner = viewScriptPreview(); break;
+    case "queued": inner = viewBusy("Queued — the analysis will start shortly…"); break;
     case "executing": inner = viewBusy("Running the analysis in the sandbox…"); break;
     case "executed": inner = viewWriteResults(); break;
     case "writing": inner = viewBusy("Writing the Results section…"); break;
@@ -536,6 +537,12 @@ function bindRunHandlers() {
   const executeBtn = document.getElementById("executeBtn");
   if (executeBtn) executeBtn.onclick = () => step("executeBtn", async () => {
     state.run = await api(`/runs/${r.id}/execute`, { method: "POST" }); render();
+    // Worker mode: the run is queued and the worker runs it + writes results in
+    // the background. Poll until it's done. (Inline mode returns "executed"
+    // straight away and this is skipped.)
+    if (state.run.status === "queued" || state.run.status === "executing") {
+      pollForResults(r.id);
+    }
   });
 
   const writeBtn = document.getElementById("writeBtn");
@@ -552,6 +559,24 @@ function bindRunHandlers() {
   if (dlWord) dlWord.onclick = () => downloadDoc("word");
   const dlPdf = document.getElementById("dlPdf");
   if (dlPdf) dlPdf.onclick = () => downloadDoc("pdf");
+}
+
+async function pollForResults(id) {
+  // Worker runs the script then writes the Results doc. Poll the run until it
+  // reaches a terminal state, keeping the busy view on screen meanwhile.
+  const iv = setInterval(async () => {
+    try {
+      const run = await api("/runs/" + id);
+      state.run = run;
+      if (["completed", "accepted", "executed", "failed"].includes(run.status)) {
+        clearInterval(iv);
+        render();
+        if (run.status === "failed") toast(run.error || "Analysis failed.", true);
+      } else {
+        render(); // refresh the busy/queued view
+      }
+    } catch (e) { /* keep polling */ }
+  }, 4000);
 }
 
 async function pollForPaid(id, reference) {

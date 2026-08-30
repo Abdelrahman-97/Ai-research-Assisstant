@@ -49,6 +49,7 @@ class RunStatus(str, Enum):
     awaiting_approval = "awaiting_approval"   # waiting for the human checkpoint
     approved = "approved"                     # plan approved (or edited + approved)
     script_ready = "script_ready"             # script generated (preview available)
+    queued = "queued"                         # handed to the background worker
     executing = "executing"
     executed = "executed"                     # artifacts collected
     writing = "writing"
@@ -253,6 +254,7 @@ class Run(BaseModel):
     # inputs
     protocol_text: str | None = None
     data_path: str | None = None
+    data_blob_id: str | None = None           # uploaded dataset in shared blob store
 
     # pricing + payment (payment happens per-run, after the estimate)
     quote: PriceQuote | None = None
@@ -272,6 +274,8 @@ class Run(BaseModel):
     results_markdown: str | None = None
     docx_path: str | None = None
     pdf_path: str | None = None
+    docx_blob_id: str | None = None           # generated Word doc in shared blob store
+    pdf_blob_id: str | None = None            # generated PDF in shared blob store
 
     # lifecycle / retention
     accepted_at: datetime | None = None

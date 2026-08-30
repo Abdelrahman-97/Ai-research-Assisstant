@@ -47,15 +47,28 @@ Postgres database in one step.
 4. Deploy. Health check is `/health`; API is at `https://<your-app>.onrender.com`
    (docs at `/docs`).
 
-### ⚠️ Script execution on Render — decide this
+### Script execution — background worker
 
-The analysis sandbox needs Docker, which Render's native runtime lacks, so
-`/execute` won't run out of the box. Choose one:
-- **MVP (quick, less safe):** set `SANDBOX_ALLOW_SUBPROCESS_FALLBACK=true` — runs
-  the generated script **without container isolation**. OK for early trusted
-  users only.
-- **Proper:** run execution on a Docker-capable host (Fly.io Machines, a small
-  VM, Fargate). Contained change — only `app/sandbox/docker_runner.py` is affected.
+Scripts run on a **separate worker service**, never on the API. The blueprint
+(`render.yaml`) provisions three things: the web API, the `ai-research-assistant-worker`
+service, and Postgres. Flow:
+
+1. The API runs with `EXECUTION_MODE=worker`, so `/execute` only marks the run
+   `queued`.
+2. The worker (`python -m app.worker`) polls the shared DB, runs the script, writes
+   the Results doc, and marks the run `completed`. Files pass between the services
+   through the DB blob store (Render services share no disk).
+
+Because Render has no Docker daemon, the worker uses the subprocess path
+(`SANDBOX_ALLOW_SUBPROCESS_FALLBACK=true`, set **only** on the worker). It's
+hardened: the child process gets a **stripped environment** (no `DATABASE_URL`,
+LLM key, JWT secret, etc.) plus CPU/memory/file-size caps. It still lacks
+container **network** isolation.
+
+- **Stronger isolation later:** point the worker at a Docker-capable host and set
+  the fallback back to `false`. Only `app/sandbox/docker_runner.py` is affected.
+- **Note:** Render worker services require a **paid** instance (the blueprint sets
+  `plan: starter`). Set `LLM_API_KEY` on the shared env group so both services get it.
 
 ### Retention cleanup (cron)
 
@@ -107,7 +120,7 @@ same repo + `DATABASE_URL` to purge files 30 days after acceptance.
 
 **Deploy:**
 - [ ] Render blueprint deployed; env vars set; `/health` green
-- [ ] Execution decision made (subprocess flag vs. Docker host)
+- [ ] Worker service running (paid instance) + `LLM_API_KEY` set on the shared env group
 - [ ] Retention cron scheduled
 - [ ] Frontend on Vercel; `config.js` → Render URL; `CORS_ORIGINS` + `FRONTEND_URL` set
 - [ ] EasyKash webhook URL set + one real test payment

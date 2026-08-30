@@ -1,11 +1,30 @@
 # Render blueprint. In Render: New + -> Blueprint -> point at this repo.
-# Creates a Python web service + a managed Postgres database.
+# Creates: a web API, a background execution worker, and a managed Postgres DB.
 #
-# NOTE ON SCRIPT EXECUTION: Render's native runtime has no Docker daemon, so the
-# analysis sandbox (docker/Dockerfile.sandbox) cannot run here. To make /execute
-# work on Render you must set SANDBOX_ALLOW_SUBPROCESS_FALLBACK=true, which runs
-# the generated script WITHOUT container isolation. That is acceptable only as a
-# short-term MVP; see DEPLOYMENT.md for the security note and safer options.
+# EXECUTION ARCHITECTURE
+# ----------------------
+# The public API never runs generated scripts. It sets EXECUTION_MODE=worker, so
+# /execute only enqueues the run (status "queued"). A separate WORKER service
+# picks the run up, runs the script in the sandbox, writes the Results doc, and
+# marks the run "completed". Files move between the two services through the
+# shared database (blob store), because Render services do not share a disk.
+#
+# The worker — and only the worker — sets SANDBOX_ALLOW_SUBPROCESS_FALLBACK=true,
+# because Render's runtime has no Docker daemon. That path runs the script with a
+# stripped environment (no secrets) and CPU/memory caps, but without container
+# network isolation. For stronger isolation, run the worker on a Docker-capable
+# host and set the fallback back to "false". See DEPLOYMENT.md.
+
+envVarGroups:
+  - name: neura-shared
+    envVars:
+      # Set once here; referenced by both the API and the worker.
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_BASE_URL
+        value: https://generativelanguage.googleapis.com/v1beta/openai/
+      - key: LLM_MODEL
+        value: gemini-2.5-flash
 
 services:
   - type: web
@@ -16,24 +35,25 @@ services:
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
+      - fromGroup: neura-shared
       - key: DATABASE_URL
         fromDatabase:
           name: ai-research-db
           property: connectionString
+      - key: EXECUTION_MODE
+        value: worker                # API enqueues; the worker runs scripts
+      - key: SANDBOX_ALLOW_SUBPROCESS_FALLBACK
+        value: "false"               # the API must never execute scripts
       - key: JWT_SECRET
         generateValue: true          # Render generates a strong secret
-      - key: LLM_API_KEY
-        sync: false                  # set in the dashboard (secret)
       - key: EASYKASH_API_KEY
         sync: false
       - key: EASYKASH_WEBHOOK_SECRET
         sync: false
       - key: CORS_ORIGINS
-        sync: false                  # set to your Vercel URL, e.g. https://yourapp.vercel.app
+        sync: false                  # your Vercel URL, e.g. https://yourapp.vercel.app
       - key: FRONTEND_URL
         sync: false                  # your Vercel URL — used to build verify/reset email links
-      - key: SANDBOX_ALLOW_SUBPROCESS_FALLBACK
-        value: "false"               # see note above before enabling
       # Email (verification + password reset). Use a provider like SendGrid/Mailgun.
       - key: SMTP_HOST
         sync: false
@@ -48,6 +68,23 @@ services:
       # Ops: set to enable the /admin endpoints (sent in the X-Admin-Token header).
       - key: ADMIN_TOKEN
         sync: false
+
+  - type: worker
+    name: ai-research-assistant-worker
+    runtime: python
+    plan: starter                    # Render workers require a paid instance
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m app.worker
+    envVars:
+      - fromGroup: neura-shared
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-research-db
+          property: connectionString
+      - key: EXECUTION_MODE
+        value: inline                # the worker runs scripts itself
+      - key: SANDBOX_ALLOW_SUBPROCESS_FALLBACK
+        value: "true"                # no Docker on Render; hardened subprocess path
 
 databases:
   - name: ai-research-db

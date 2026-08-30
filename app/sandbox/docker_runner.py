@@ -16,6 +16,7 @@ boundary, so it is OFF by default and must never be enabled in production.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import tempfile
@@ -30,6 +31,48 @@ _INTERPRETER = {Language.python: "python", Language.r: "Rscript"}
 
 def _docker_available() -> bool:
     return shutil.which("docker") is not None
+
+
+def _safe_subprocess_env() -> dict[str, str]:
+    """A minimal environment for the analysis subprocess.
+
+    The subprocess path has no container boundary, so we do NOT inherit the
+    parent environment — that would expose DATABASE_URL, the LLM key, JWT secret,
+    etc. to generated code. We pass only what a scientific script legitimately
+    needs, and force matplotlib into a headless backend.
+    """
+    keep = ("PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "SYSTEMROOT")
+    env = {k: os.environ[k] for k in keep if k in os.environ}
+    env.setdefault("HOME", "/tmp")
+    env["MPLBACKEND"] = "Agg"          # never try to open a display
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    env["OPENBLAS_NUM_THREADS"] = "2"  # keep a runaway script from pinning all cores
+    env["OMP_NUM_THREADS"] = "2"
+    return env
+
+
+def _limit_resources() -> None:
+    """Cap memory/CPU/file size for the subprocess (best-effort, POSIX only).
+
+    Runs in the child just before exec. On platforms without `resource` (Windows)
+    this is a no-op — the wall-clock timeout in subprocess.run still applies.
+    """
+    try:
+        import resource
+    except ImportError:  # pragma: no cover - non-POSIX
+        return
+    mem = 1024 * 1024 * 1024  # 1 GB address space
+    cpu = max(1, settings.sandbox_timeout_seconds)  # CPU seconds ~ wall timeout
+    fsize = 256 * 1024 * 1024  # 256 MB max single output file
+    for res, limit in (
+        (resource.RLIMIT_AS, mem),
+        (resource.RLIMIT_CPU, cpu),
+        (resource.RLIMIT_FSIZE, fsize),
+    ):
+        try:
+            resource.setrlimit(res, (limit, limit))
+        except (ValueError, OSError):  # pragma: no cover
+            pass
 
 
 def _prepare_workdir(workdir: Path, script: str, language: Language, data_path: str) -> str:
@@ -112,6 +155,15 @@ def run_in_sandbox(
                 exit_code=None,
             )
 
+        # Harden the no-container path: a stripped env (no secrets) and, on POSIX,
+        # memory/CPU/file-size caps applied in the child. Docker runs handle
+        # isolation themselves and keep the normal env (needed to find `docker`).
+        run_kwargs: dict = {}
+        if use_subprocess:
+            run_kwargs["env"] = _safe_subprocess_env()
+            if os.name == "posix":
+                run_kwargs["preexec_fn"] = _limit_resources
+
         try:
             proc = subprocess.run(
                 cmd,
@@ -119,6 +171,7 @@ def run_in_sandbox(
                 capture_output=True,
                 text=True,
                 timeout=timeout,
+                **run_kwargs,
             )
         except subprocess.TimeoutExpired:
             return ExecutionResult(
