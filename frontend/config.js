@@ -6,7 +6,7 @@
  * Production (Vercel frontend -> Render backend): set this to your Render URL,
  * e.g. "https://ai-research-assistant-api.onrender.com" (no trailing slash).
  */
-window.API_BASE = "http://localhost:8000";
+window.API_BASE = "https://ai-research-assistant-api-7qfo.onrender.com";
 
 /* Support contact — shown in the footer and the floating WhatsApp button.
  * WhatsApp number in international format, digits only (no +, spaces, or dashes),
