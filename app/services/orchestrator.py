@@ -190,16 +190,46 @@ def enqueue_execution(run: Run) -> Run:
     return _touch(run)
 
 
+def _ensure_local_data(run: Run) -> str:
+    """Guarantee the dataset exists on this machine, returning its path.
+
+    Local disk is ephemeral (wiped on redeploy) and not shared between services,
+    so if the uploaded file is gone we rehydrate it from the durable blob store.
+    """
+    if run.data_path and Path(run.data_path).exists():
+        return run.data_path
+    if run.data_blob_id:
+        got = blobs.get(run.data_blob_id)
+        if got:
+            dest_dir = Path(settings.data_dir) / "uploads" / run.id
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            dest = dest_dir / got[0]
+            dest.write_bytes(got[1])
+            run.data_path = str(dest)
+            return run.data_path
+    raise PipelineError("The uploaded dataset is no longer available for this run.")
+
+
 def run_script(run: Run) -> Run:
     """Step 5: execute the previewed script in the sandbox."""
     _require_paid(run)
-    if run.status not in (RunStatus.script_ready, RunStatus.queued) or not run.script or not run.language:
+    retryable = {RunStatus.script_ready, RunStatus.queued, RunStatus.executing, RunStatus.failed}
+    if run.status not in retryable or not run.script or not run.language:
         raise PipelineError("Generate a script before running it.")
+
+    data_path = _ensure_local_data(run)
 
     run.status = RunStatus.executing
     _touch(run)
 
-    execution = stats_executor.execute(run.script, run.language, run.data_path)
+    try:
+        execution = stats_executor.execute(run.script, run.language, data_path)
+    except Exception as exc:
+        # Never leave the run stuck in `executing` on an unexpected error.
+        run.status = RunStatus.failed
+        run.error = f"Execution error: {exc}"
+        _touch(run)
+        raise PipelineError(run.error) from exc
     run.execution = execution
     if execution.status == RunStatus.failed:
         run.status = RunStatus.failed
@@ -211,7 +241,7 @@ def run_script(run: Run) -> Run:
     for analysis in run.additional_analyses:
         if analysis.script:
             analysis.execution = stats_executor.execute(
-                analysis.script, analysis.language, run.data_path
+                analysis.script, analysis.language, data_path
             )
 
     run.status = RunStatus.executed
