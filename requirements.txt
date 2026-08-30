@@ -24,6 +24,12 @@ psycopg2-binary     # Postgres driver (only needed when using Postgres)
 pandas
 openpyxl            # .xlsx reading
 
+# --- Scientific stack (used by the generated analysis scripts) ---
+numpy
+scipy               # statistical tests
+statsmodels         # regression / ANOVA / mixed models
+matplotlib          # figures (headless 'Agg' backend at runtime)
+
 # --- Document export (Markdown -> .docx / .pdf) ---
 python-docx
 reportlab           # PDF generation
