@@ -43,6 +43,16 @@ Rules:
 - Do NOT access the network. Do NOT install packages. Use only the standard
   scientific stack (for Python: pandas, numpy, scipy, statsmodels, matplotlib;
   for R: base + stats).
+- IMPORTS: import ONLY what you actually use, and import it at the top. Do NOT
+  import power-analysis, sample-size, or effect-size helper functions, and do NOT
+  import any name you are not certain exists. Prefer scipy.stats for standard
+  tests (e.g. ttest_ind, mannwhitneyu, f_oneway, pearsonr, spearmanr,
+  chi2_contingency, shapiro, levene). If a specific statsmodels function name is
+  uncertain, compute the quantity directly with numpy/scipy instead.
+- Do NOT perform power analysis or sample-size calculation unless the test itself
+  IS a power/sample-size analysis. Stick to exactly the approved test.
+- The script must run top-to-bottom with no ImportError, NameError, or unused
+  imports.
 - ROBUSTNESS (important): compute and print/save ALL statistics BEFORE creating any
   figures, and wrap the entire figure/plotting section in a try/except (Python) or
   tryCatch (R) that prints a warning and continues on error. A plotting failure
