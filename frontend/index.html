@@ -8,15 +8,25 @@
   <link rel="icon" href="favicon.svg" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <meta name="theme-color" content="#6366F1" />
+  <meta name="theme-color" content="#0a6b63" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Neura" />
+  <script>
+    /* Apply saved light/dark choice before paint to avoid a flash. */
+    (function () {
+      try {
+        var t = localStorage.getItem("neura_theme");
+        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><svg width="20" height="20" viewBox="0 0 64 64" style="vertical-align:-3px" fill="none" stroke="#6366F1" stroke-width="8" stroke-linecap="round"><line x1="20" y1="18" x2="20" y2="46"/><line x1="44" y1="18" x2="44" y2="46"/><line x1="20" y1="18" x2="44" y2="46"/><circle cx="44" cy="18" r="7" fill="#6366F1" stroke="none"/></svg><span class="brand-word">Neura<span class="brand-sub">RESEARCH</span></span></div>
+    <div class="brand"><svg width="20" height="20" viewBox="0 0 64 64" style="vertical-align:-3px" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"><line x1="20" y1="18" x2="20" y2="46"/><line x1="44" y1="18" x2="44" y2="46"/><line x1="20" y1="18" x2="44" y2="46"/><circle cx="44" cy="18" r="7" fill="currentColor" stroke="none"/></svg><span class="brand-word">Neura<span class="brand-sub">RESEARCH</span></span></div>
     <div class="topbar-right">
+      <button id="themeToggle" class="theme-toggle" title="Appearance">◐ Auto</button>
       <span id="userEmail" class="user-email"></span>
       <button id="logoutBtn" class="btn btn-ghost hidden">Log out</button>
     </div>

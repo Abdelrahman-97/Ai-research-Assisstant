@@ -58,6 +58,23 @@ document.getElementById("logoutBtn").onclick = () => {
   state.view = "auth"; render();
 };
 
+/* Appearance toggle: Auto → Light → Dark, remembered per browser. */
+(function setupThemeToggle() {
+  const btn = document.getElementById("themeToggle");
+  if (!btn) return;
+  const order = ["auto", "light", "dark"];
+  const labels = { auto: "◐ Auto", light: "☀ Light", dark: "☾ Dark" };
+  let cur = localStorage.getItem("neura_theme") || "auto";
+  const apply = (t) => {
+    if (t === "auto") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", t);
+    btn.textContent = labels[t];
+    try { localStorage.setItem("neura_theme", t); } catch (e) {}
+  };
+  apply(cur);
+  btn.onclick = () => { cur = order[(order.indexOf(cur) + 1) % order.length]; apply(cur); };
+})();
+
 /* ------------------------------- Screens ------------------------------- */
 const STEPS = [
   ["upload", "Upload"], ["estimate", "Price"], ["pay", "Pay"],
