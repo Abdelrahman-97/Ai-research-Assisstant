@@ -19,17 +19,21 @@ from app.api.deps import get_current_user
 from app.config import settings
 from app.ratelimit import limiter
 from app.models.schemas import (
+    Artifact,
     AssistantRequest,
     AssistantResponse,
     CreateRunRequest,
     EstimateRequest,
+    FormatSpec,
     Language,
     PaymentLink,
     Run,
     TestConfirmation,
     User,
 )
-from app.services import assistant, cleanup, orchestrator, payments
+from app.services import (
+    assistant, cleanup, formatting, orchestrator, payments, report_writer,
+)
 from app.services.llm_client import LLMError
 from app.services.orchestrator import PipelineError
 from app.store import blobs, repository
@@ -137,7 +141,11 @@ def estimate(
 ) -> Run:
     """Free: compute the price from scope, data, estimated tests, and word count."""
     run = _get_owned_run(run_id, user)
-    return _guard(lambda: orchestrator.estimate(run, body.word_count, body.assistant_tier))
+    return _guard(
+        lambda: orchestrator.estimate(
+            run, body.word_count, body.assistant_tier, body.consultation
+        )
+    )
 
 
 @router.post("/{run_id}/pay-link", response_model=PaymentLink)
@@ -151,6 +159,153 @@ def pay_link(run_id: str, user: User = Depends(get_current_user)) -> PaymentLink
         )
     amount = run.quote.customer_total_egp or run.quote.amount_egp
     return payments.create_payment_link(run.id, user.email, amount)
+
+
+def _build_format_spec(
+    *, preset, font_name, font_size_pt, line_spacing, heading_numbering,
+    figure_start_number, table_start_number, caption_above_table, template_blob_id,
+) -> FormatSpec:
+    return FormatSpec(
+        preset=(preset if template_blob_id is None else "template"),
+        font_name=font_name or None,
+        font_size_pt=font_size_pt,
+        line_spacing=line_spacing,
+        heading_numbering=heading_numbering,
+        figure_start_number=figure_start_number or 1,
+        table_start_number=table_start_number or 1,
+        caption_above_table=caption_above_table,
+        template_blob_id=template_blob_id,
+    )
+
+
+async def _read_capped(f: UploadFile) -> bytes:
+    limit = settings.max_upload_mb * 1024 * 1024
+    data = b""
+    while chunk := await f.read(1024 * 1024):
+        data += chunk
+        if len(data) > limit:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Template too large (max {settings.max_upload_mb} MB).",
+            )
+    return data
+
+
+def _ensure_sample_fig() -> str:
+    """Draw the sample bar chart once and cache it for the style preview."""
+    p = Path(settings.data_dir) / "sample_fig.png"
+    if p.exists():
+        return str(p)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(5, 3))
+    plt.bar(["Intervention", "Control"], [3.8, 2.1], color=["#6366F1", "#cfc9bd"])
+    plt.ylabel("Pain reduction")
+    plt.tight_layout()
+    plt.savefig(str(p), dpi=120)
+    plt.close()
+    return str(p)
+
+
+def _sample_artifacts(tmpdir: str) -> list[Artifact]:
+    import csv as _csv
+    csvp = Path(tmpdir) / "sample_table.csv"
+    with csvp.open("w", newline="", encoding="utf-8") as f:
+        w = _csv.writer(f)
+        w.writerow(formatting.SAMPLE_TABLE_HEADERS)
+        for row in formatting.SAMPLE_TABLE_ROWS:
+            w.writerow(row)
+    return [
+        Artifact(kind="table", path=str(csvp), caption=formatting.SAMPLE_TABLE_CAPTION),
+        Artifact(kind="figure", path=_ensure_sample_fig(), caption=formatting.SAMPLE_FIGURE_CAPTION),
+    ]
+
+
+@router.get("/format/presets")
+def format_presets(user: User = Depends(get_current_user)) -> list[dict]:
+    """List the built-in format presets for the picker."""
+    return formatting.presets_public()
+
+
+@router.post("/format-sample")
+async def format_sample(
+    format: str = Query("pdf", pattern="^(pdf|word)$"),
+    preset: str = Form("standard"),
+    font_name: str | None = Form(None),
+    font_size_pt: float | None = Form(None),
+    line_spacing: float | None = Form(None),
+    heading_numbering: bool | None = Form(None),
+    figure_start_number: int = Form(1),
+    table_start_number: int = Form(1),
+    caption_above_table: bool = Form(True),
+    template: UploadFile | None = File(None),
+    user: User = Depends(get_current_user),
+):
+    """Render a one-page style sample (mock content) in the chosen format."""
+    import tempfile
+    tmp = tempfile.mkdtemp()
+    template_path = None
+    if template is not None and (template.filename or "").lower().endswith(".docx"):
+        template_path = Path(tmp) / "template.docx"
+        template_path.write_bytes(await _read_capped(template))
+        preset = "template"
+
+    spec = _build_format_spec(
+        preset=preset, font_name=font_name, font_size_pt=font_size_pt,
+        line_spacing=line_spacing, heading_numbering=heading_numbering,
+        figure_start_number=figure_start_number, table_start_number=table_start_number,
+        caption_above_table=caption_above_table,
+        template_blob_id=("sample" if template_path else None),
+    )
+    fmt = formatting.resolve(spec)
+    arts = _sample_artifacts(tmp)
+
+    if format == "pdf":
+        out = Path(tmp) / "sample.pdf"
+        report_writer.markdown_to_pdf(formatting.SAMPLE_MARKDOWN, arts, out, fmt=fmt)
+        media = "application/pdf"
+    else:
+        out = Path(tmp) / "sample.docx"
+        report_writer.markdown_to_docx(
+            formatting.SAMPLE_MARKDOWN, arts, out, fmt=fmt, template_path=template_path
+        )
+        media = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    return Response(content=out.read_bytes(), media_type=media, headers={
+        "Content-Disposition": f'inline; filename="format-sample.{ "pdf" if format=="pdf" else "docx" }"'
+    })
+
+
+@router.post("/{run_id}/format", response_model=Run)
+async def set_format(
+    run_id: str,
+    preset: str = Form("standard"),
+    font_name: str | None = Form(None),
+    font_size_pt: float | None = Form(None),
+    line_spacing: float | None = Form(None),
+    heading_numbering: bool | None = Form(None),
+    figure_start_number: int = Form(1),
+    table_start_number: int = Form(1),
+    caption_above_table: bool = Form(True),
+    template: UploadFile | None = File(None),
+    user: User = Depends(get_current_user),
+) -> Run:
+    """Set the output format for this run (optionally uploading a style template)."""
+    run = _get_owned_run(run_id, user)
+    template_blob_id = None
+    if template is not None and (template.filename or "").lower().endswith(".docx"):
+        content = await _read_capped(template)
+        template_blob_id = blobs.put(
+            run_id, kind="template", filename=template.filename or "template.docx", content=content
+        )
+    run.format_spec = _build_format_spec(
+        preset=preset, font_name=font_name, font_size_pt=font_size_pt,
+        line_spacing=line_spacing, heading_numbering=heading_numbering,
+        figure_start_number=figure_start_number, table_start_number=table_start_number,
+        caption_above_table=caption_above_table, template_blob_id=template_blob_id,
+    )
+    return repository.runs.save(run)
 
 
 @router.post("/{run_id}/plan", response_model=Run)

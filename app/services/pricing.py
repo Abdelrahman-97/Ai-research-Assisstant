@@ -102,6 +102,15 @@ def gross_up_for_fees(net_egp: int) -> int:
     return math.ceil(net_egp / (1 - rate)) + flat
 
 
+def _consultation_cost(consultation: str) -> tuple[int, str]:
+    """Return (egp, label) for the chosen expert add-on."""
+    if consultation == "review":
+        return settings.price_consultation_review_egp, "expert review"
+    if consultation == "full":
+        return settings.price_consultation_full_egp, "full expert analysis"
+    return 0, ""
+
+
 def quote(
     *,
     scope: Scope,
@@ -109,6 +118,7 @@ def quote(
     n_tests: int,
     word_count: int,
     assistant_tier: str = "basic",
+    consultation: str = "none",
 ) -> PriceQuote:
     """Build a price quote with a transparent breakdown."""
     base = (
@@ -126,6 +136,8 @@ def quote(
     tier_name = assistant_tier if assistant_tier in {"basic", "standard", "pro"} else settings.assistant_default_tier
     assistant_cost = int(tier["extra_egp"])
 
+    consult_cost, consult_label = _consultation_cost(consultation)
+
     breakdown = {
         f"base ({scope.value})": base,
         f"tests (x{n_tests})": tests_cost,
@@ -136,8 +148,10 @@ def quote(
     # tier's breakdown clean).
     if assistant_cost:
         breakdown[f"interaction ({tier['label']})"] = assistant_cost
+    if consult_cost:
+        breakdown[consult_label] = consult_cost
 
-    total = base + tests_cost + words_cost + data_cost + assistant_cost
+    total = base + tests_cost + words_cost + data_cost + assistant_cost + consult_cost
     customer_total = (
         gross_up_for_fees(total) if settings.easykash_pass_fees_to_customer else total
     )
@@ -149,4 +163,5 @@ def quote(
         word_count=word_count,
         assistant_tier=tier_name,
         assistant_allowance=int(tier["messages"]),
+        consultation=consultation if consultation in {"none", "review", "full"} else "none",
     )

@@ -155,6 +155,32 @@ class EstimateRequest(BaseModel):
         default="basic",
         description="Interaction tier: how many assistant messages are included.",
     )
+    consultation: str = Field(
+        default="none",
+        description="Expert add-on: none | review (+fee) | full (expert does it all).",
+    )
+
+
+class FormatSpec(BaseModel):
+    """How the final Results document should be styled.
+
+    `preset` picks a built-in look; `custom` uses the knobs below; `template`
+    matches an uploaded document's own styles (font, headings, captions).
+    Any knob left None falls back to the preset's default, so custom overrides
+    can be layered on top of a preset too.
+    """
+
+    preset: str = "standard"     # standard|apa|vancouver|two_column|custom|template
+    font_name: str | None = None         # e.g. "Times New Roman", "Arial"
+    font_size_pt: float | None = None    # e.g. 12
+    line_spacing: float | None = None    # 1.0 | 1.5 | 2.0
+    heading_numbering: bool | None = None  # numbered (1, 1.1) vs plain headings
+    # Figures and tables are captioned "Figure N." / "Table N.". The chapter may
+    # follow existing ones, so the first number is configurable.
+    figure_start_number: int = 1
+    table_start_number: int = 1
+    caption_above_table: bool = True     # journals differ: table captions usually above
+    template_blob_id: str | None = None  # uploaded style template (preset="template")
 
 
 class PriceQuote(BaseModel):
@@ -167,6 +193,7 @@ class PriceQuote(BaseModel):
     word_count: int = 0
     assistant_tier: str = "basic"        # chosen interaction tier
     assistant_allowance: int = 0         # assistant messages included by that tier
+    consultation: str = "none"           # expert add-on: none | review | full
 
 
 # --------------------------------------------------------------------------- #
@@ -333,6 +360,12 @@ class Run(BaseModel):
     assistant_tier: str = "basic"
     assistant_allowance: int = 0
     assistant_used: int = 0
+
+    # expert add-on chosen at the estimate step (none | review | full)
+    consultation: str = "none"
+
+    # output formatting (how the .docx/.pdf are styled)
+    format_spec: FormatSpec | None = None
 
     # outputs
     results_markdown: str | None = None

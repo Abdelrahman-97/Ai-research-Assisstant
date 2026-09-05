@@ -12,4 +12,4 @@ window.API_BASE = "https://api.neura-research.com";
  * WhatsApp number in international format, digits only (no +, spaces, or dashes),
  * e.g. Egypt: "201001234567". Email is your professional support address. */
 window.SUPPORT_WHATSAPP = "201066102204";           // Egypt WhatsApp (int'l format)
-window.SUPPORT_EMAIL = "";                           // set once the domain mailbox exists
+window.SUPPORT_EMAIL = "support@neura-research.com"; // domain mailbox (Zoho)

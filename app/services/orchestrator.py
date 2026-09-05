@@ -36,6 +36,7 @@ from app.models.schemas import (
 )
 from app.services import (
     evidence,
+    formatting,
     integrity_checker,
     planner,
     pricing,
@@ -76,7 +77,12 @@ def ingest(run: Run, protocol_text: str, data_path: str) -> Run:
     return _touch(run)
 
 
-def estimate(run: Run, word_count: int, assistant_tier: str = "basic") -> Run:
+def estimate(
+    run: Run,
+    word_count: int,
+    assistant_tier: str = "basic",
+    consultation: str = "none",
+) -> Run:
     """Step 2 (free): estimate the price from scope, data, tests, words, tier."""
     if run.status not in (RunStatus.uploaded, RunStatus.awaiting_payment):
         raise PipelineError("Upload valid data before requesting a price estimate.")
@@ -88,11 +94,13 @@ def estimate(run: Run, word_count: int, assistant_tier: str = "basic") -> Run:
         n_tests=n_tests,
         word_count=word_count,
         assistant_tier=assistant_tier,
+        consultation=consultation,
     )
     run.quote = quote
     # Lock in the interaction allowance for this run from the chosen tier.
     run.assistant_tier = quote.assistant_tier
     run.assistant_allowance = quote.assistant_allowance
+    run.consultation = quote.consultation
     run.status = RunStatus.awaiting_payment
     return _touch(run)
 
@@ -289,8 +297,23 @@ def write_results(run: Run) -> Run:
         out_dir = Path(settings.data_dir) / "outputs"
         docx_path = out_dir / f"results_{run.id}.docx"
         pdf_path = out_dir / f"results_{run.id}.pdf"
-        report_writer.markdown_to_docx(markdown, all_artifacts, docx_path)
-        report_writer.markdown_to_pdf(markdown, all_artifacts, pdf_path)
+
+        # Resolve the chosen output format; rehydrate the style template if the
+        # user chose "match my document".
+        fmt = formatting.resolve(run.format_spec)
+        template_path = None
+        if fmt.use_template and fmt.template_blob_id:
+            got = blobs.get(fmt.template_blob_id)
+            if got:
+                tdir = out_dir / "templates"
+                tdir.mkdir(parents=True, exist_ok=True)
+                template_path = tdir / f"tpl_{run.id}.docx"
+                template_path.write_bytes(got[1])
+
+        report_writer.markdown_to_docx(
+            markdown, all_artifacts, docx_path, fmt=fmt, template_path=template_path
+        )
+        report_writer.markdown_to_pdf(markdown, all_artifacts, pdf_path, fmt=fmt)
         # Persist outputs to the shared blob store: durable across redeploys and
         # reachable by the API when the worker is what generated them.
         run.docx_blob_id = blobs.put(

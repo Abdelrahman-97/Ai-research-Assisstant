@@ -81,6 +81,15 @@ def test_every_endpoint(tmp_path):
     est = client.post(f"/runs/{run_id}/estimate", headers=auth, json={"word_count": 800})
     assert est.status_code == 200; hit.add("/runs/{run_id}/estimate")
 
+    # output formatting: presets, instant sample, and setting the run's format
+    assert client.get("/runs/format/presets", headers=auth).status_code == 200
+    hit.add("/runs/format/presets")
+    smp = client.post("/runs/format-sample?format=pdf", headers=auth, data={"preset": "standard"})
+    assert smp.status_code == 200 and smp.content[:4] == b"%PDF"; hit.add("/runs/format-sample")
+    assert client.post(f"/runs/{run_id}/format", headers=auth,
+                       data={"preset": "apa", "figure_start_number": 5}).status_code == 200
+    hit.add("/runs/{run_id}/format")
+
     ref = client.post(f"/runs/{run_id}/pay-link", headers=auth).json()["reference"]
     hit.add("/runs/{run_id}/pay-link")
     assert client.post("/payments/callback", json={"reference": ref, "status": "success"}).status_code == 200

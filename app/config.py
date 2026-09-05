@@ -92,11 +92,15 @@ class Settings(BaseSettings):
     admin_token: str = ""
 
     # --- Pricing (all EGP). Tunable — change these to reprice without code edits. ---
-    price_base_thesis_egp: int = 1500     # base price for a thesis results chapter
-    price_base_paper_egp: int = 800       # base price for a paper's results section
-    price_per_test_egp: int = 300         # per estimated statistical test
-    price_per_1000_words_egp: int = 100   # per 1000 words of Results text
-    price_per_1000_cells_egp: int = 20    # per 1000 data cells (rows x cols)
+    price_base_thesis_egp: int = 600      # base price for a thesis results chapter
+    price_base_paper_egp: int = 350       # base price for a paper's results section
+    price_per_test_egp: int = 100         # per estimated statistical test
+    price_per_1000_words_egp: int = 40    # per 1000 words of Results text
+    price_per_1000_cells_egp: int = 10    # per 1000 data cells (rows x cols)
+    # Optional human expert add-ons (EGP). "review" = an expert checks the AI's
+    # results; "full" = an expert performs the whole analysis (longer turnaround).
+    price_consultation_review_egp: int = 500
+    price_consultation_full_egp: int = 3000
 
     # --- Analyst assistant (free-text control layer) ---
     assistant_enabled: bool = True
@@ -138,9 +142,9 @@ settings = get_settings()
 ASSISTANT_TIERS: dict[str, dict] = {
     "basic":    {"label": "Basic",    "messages": 8,   "extra_egp": 0,
                  "blurb": "Edit the plan and ask a few questions."},
-    "standard": {"label": "Standard", "messages": 25,  "extra_egp": 150,
+    "standard": {"label": "Standard", "messages": 25,  "extra_egp": 75,
                  "blurb": "Refine tests, re-run, and iterate comfortably."},
-    "pro":      {"label": "Pro",      "messages": 80,  "extra_egp": 400,
+    "pro":      {"label": "Pro",      "messages": 80,  "extra_egp": 200,
                  "blurb": "Heavy back-and-forth and multiple analyses."},
 }
 

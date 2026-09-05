@@ -358,8 +358,15 @@ function viewEstimate() {
     <p class="sub" style="margin-top:2px;">How much you can chat to refine the plan, re-run, or add analyses.</p>
     <select id="assistantTier">
       <option value="basic" selected>Basic — a few messages, included</option>
-      <option value="standard">Standard — comfortable back-and-forth (+150 EGP)</option>
-      <option value="pro">Pro — heavy iteration & multiple analyses (+400 EGP)</option>
+      <option value="standard">Standard — comfortable back-and-forth (+75 EGP)</option>
+      <option value="pro">Pro — heavy iteration & multiple analyses (+200 EGP)</option>
+    </select>
+    <label style="margin-top:18px;">Expert consultation (optional)</label>
+    <p class="sub" style="margin-top:2px;">Add a human statistician for extra confidence.</p>
+    <select id="consultation">
+      <option value="none" selected>None — the AI does the analysis</option>
+      <option value="review">Expert review of the results (+500 EGP)</option>
+      <option value="full">Full expert analysis by a statistician (+3000 EGP, longer turnaround)</option>
     </select>
     <div class="btn-row"><button id="estimateBtn" class="btn btn-primary">Get price</button></div>`;
 }
@@ -446,15 +453,62 @@ function viewScriptPreview() {
     <pre class="code">${esc(state.run.script || "")}</pre>
     <div class="btn-row"><button id="executeBtn" class="btn btn-primary">Run analysis</button></div>`;
 }
+function formatPicker() {
+  return `
+    <div class="card" style="margin-top:16px;background:#fbfaf7;">
+      <strong>Output format</strong>
+      <p class="sub" style="margin-top:2px;">How your Word &amp; PDF will look. Preview a sample before writing.</p>
+      <label>Style</label>
+      <select id="fmtPreset">
+        <option value="standard">Standard academic (Times New Roman 12)</option>
+        <option value="apa">APA 7th (double-spaced)</option>
+        <option value="vancouver">Vancouver (numbered)</option>
+        <option value="two_column">Two-column manuscript</option>
+        <option value="template">Match my document (upload)</option>
+        <option value="custom">Custom</option>
+      </select>
+      <div id="fmtTemplateWrap" class="hidden">
+        <label>Upload your thesis/paper (.docx) — we match its exact styles</label>
+        <input id="fmtTemplate" type="file" accept=".docx" />
+      </div>
+      <div id="fmtCustomWrap" class="hidden">
+        <label>Font</label>
+        <select id="fmtFont">
+          <option>Times New Roman</option><option>Arial</option>
+          <option>Calibri</option><option>Georgia</option>
+        </select>
+        <label>Font size (pt)</label>
+        <input id="fmtSize" type="number" min="8" max="18" step="0.5" value="12" />
+        <label>Line spacing</label>
+        <select id="fmtSpacing">
+          <option value="1.0">Single</option>
+          <option value="1.5" selected>1.5</option>
+          <option value="2.0">Double</option>
+        </select>
+        <label class="agree"><input type="checkbox" id="fmtNumbering" checked />
+          <span>Numbered headings (1, 1.1)</span></label>
+      </div>
+      <div style="display:flex;gap:12px;">
+        <div style="flex:1;"><label>First figure number</label>
+          <input id="fmtFigStart" type="number" min="1" value="1" /></div>
+        <div style="flex:1;"><label>First table number</label>
+          <input id="fmtTblStart" type="number" min="1" value="1" /></div>
+      </div>
+      <p class="sub" style="margin-top:8px;">Tip: if your chapter follows existing tables/figures, set the first numbers to continue from them.</p>
+      <div class="btn-row"><button id="fmtPreview" class="btn btn-ghost">👁 Preview a sample</button></div>
+    </div>`;
+}
+
 function viewWriteResults() {
   const ex = state.run.execution || {};
   const arts = (ex.artifacts || []).map(a => `<span class="tag">${esc(a.caption || a.kind)}</span>`).join("");
   return `
     <h2>Analysis complete <span class="pill ok">executed</span></h2>
-    <p class="sub">Output captured. Now the AI writes the Results section grounded in these numbers.</p>
+    <p class="sub">Output captured. Choose your document format, then the AI writes the Results section grounded in these numbers.</p>
     <label>Output</label>
     <pre class="code">${esc((ex.stdout || "").slice(0, 2000) || "(no output)")}</pre>
     <div>${arts}</div>
+    ${formatPicker()}
     <div class="btn-row"><button id="writeBtn" class="btn btn-primary">Write Results section</button></div>`;
 }
 function viewResults() {
@@ -509,7 +563,9 @@ function bindRunHandlers() {
     const wc = parseInt(document.getElementById("wordCount").value, 10);
     const tierEl = document.getElementById("assistantTier");
     const assistant_tier = tierEl ? tierEl.value : "basic";
-    state.run = await api(`/runs/${r.id}/estimate`, { method: "POST", body: { word_count: wc, assistant_tier } });
+    const consEl = document.getElementById("consultation");
+    const consultation = consEl ? consEl.value : "none";
+    state.run = await api(`/runs/${r.id}/estimate`, { method: "POST", body: { word_count: wc, assistant_tier, consultation } });
     render();
   });
 
@@ -581,8 +637,39 @@ function bindRunHandlers() {
     }
   });
 
+  // Output-format picker: toggle sub-fields, preview a sample, apply on write.
+  const fmtPreset = document.getElementById("fmtPreset");
+  if (fmtPreset) {
+    const toggle = () => {
+      const v = fmtPreset.value;
+      const tw = document.getElementById("fmtTemplateWrap");
+      const cw = document.getElementById("fmtCustomWrap");
+      if (tw) tw.classList.toggle("hidden", v !== "template");
+      if (cw) cw.classList.toggle("hidden", v !== "custom");
+    };
+    fmtPreset.onchange = toggle; toggle();
+  }
+  const fmtPreview = document.getElementById("fmtPreview");
+  if (fmtPreview) fmtPreview.onclick = () => step("fmtPreview", async () => {
+    try {
+      const fd = buildFormatForm();
+      const blob = await api(`/runs/format-sample?format=pdf`, { method: "POST", form: fd });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) {
+      toast("Preview needs the latest update — you can still pick a format and continue.", true);
+    }
+  });
+
   const writeBtn = document.getElementById("writeBtn");
   if (writeBtn) writeBtn.onclick = () => step("writeBtn", async () => {
+    // Apply the chosen format first (best-effort: if the backend predates this
+    // feature it 404s — we just fall back to the default format).
+    try {
+      const fd = buildFormatForm();
+      if (fd) await api(`/runs/${r.id}/format`, { method: "POST", form: fd });
+    } catch (e) { /* older backend without /format — proceed with default */ }
     state.run = await api(`/runs/${r.id}/results`, { method: "POST" }); render();
   });
 
@@ -662,6 +749,27 @@ async function pollForPaid(id, reference) {
     }
     if (tries > 20) clearInterval(iv);
   }, 2500);
+}
+
+function buildFormatForm() {
+  const presetEl = document.getElementById("fmtPreset");
+  if (!presetEl) return null;
+  const fd = new FormData();
+  const preset = presetEl.value;
+  fd.append("preset", preset);
+  fd.append("figure_start_number", document.getElementById("fmtFigStart").value || "1");
+  fd.append("table_start_number", document.getElementById("fmtTblStart").value || "1");
+  if (preset === "custom") {
+    fd.append("font_name", document.getElementById("fmtFont").value);
+    fd.append("font_size_pt", document.getElementById("fmtSize").value);
+    fd.append("line_spacing", document.getElementById("fmtSpacing").value);
+    fd.append("heading_numbering", document.getElementById("fmtNumbering").checked ? "true" : "false");
+  }
+  if (preset === "template") {
+    const f = document.getElementById("fmtTemplate");
+    if (f && f.files[0]) fd.append("template", f.files[0]);
+  }
+  return fd;
 }
 
 async function downloadDoc(format) {
