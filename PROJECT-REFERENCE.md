@@ -196,4 +196,11 @@ Change these in `app/config.py` (pricing block + ASSISTANT_TIERS), then rebuild.
 - **Tables rendered as real tables**, **numbered figure/table captions** with a
   configurable **start number**, spacing and heading-numbering controls.
 - **Expert consultation** add-ons (review +500 / full +3000).
+- **UI redesign**: Apple-academic theme — serif headings, teal accent, pill
+  buttons, frosted top bar, smooth motion, and a **light/dark toggle** (Auto /
+  Light / Dark) in the top bar. Applied across every page. Frontend-only, so it
+  goes live as soon as you push (Vercel); no server rebuild needed for the look.
 - See `ROADMAP.md` for the blog and consultant-marketplace ideas.
+
+**Note:** two commits are waiting to be pushed (formatting/consultation +
+redesign). A single `git push` ships both.
