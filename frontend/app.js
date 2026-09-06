@@ -253,6 +253,7 @@ async function renderDashboard() {
         <nav class="sidenav">
           <h4>More</h4>
           <a class="navlink" href="about.html"><span class="ic">ℹ️</span> About Neura</a>
+          <a class="navlink" href="blog.html"><span class="ic">📰</span> Blog</a>
           <button class="navlink" id="navDelete" style="color:var(--err);"><span class="ic">🗑️</span> Delete account</button>
         </nav>
       </aside>
