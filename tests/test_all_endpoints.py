@@ -121,19 +121,22 @@ def test_every_endpoint(tmp_path):
 
     assert client.get("/runs/does-not-exist", headers=auth).status_code == 404
 
+    # paid tool job (meta-analysis) — deterministic engine, no LLM
+    tr = client.post("/runs", headers=auth, json={"task": "meta_analysis", "scope": "studies"}).json()["id"]
+    te = client.post(f"/runs/{tr}/tool-estimate", headers=auth,
+                     json={"inputs": {"studies": [{"effect": 0.2, "se": 0.1}, {"effect": 0.4, "se": 0.15}]}})
+    assert te.status_code == 200; hit.add("/runs/{run_id}/tool-estimate")
+    tref = client.post(f"/runs/{tr}/pay-link", headers=auth).json()["reference"]
+    client.post("/payments/callback", json={"reference": tref, "status": "success"})
+    tc = client.post(f"/runs/{tr}/tool-compute", headers=auth)
+    assert tc.status_code == 200 and tc.json()["status"] == "completed", tc.text
+    hit.add("/runs/{run_id}/tool-compute")
+
     # account deletion + admin (full flows in test_hardening.py) — hit for coverage
     client.delete("/auth/me", headers=auth); hit.add("/auth/me")
     for p in ("/admin/stats", "/admin/runs"):
         client.get(p); hit.add(p)
     client.post("/admin/runs/x/refund"); hit.add("/admin/runs/{run_id}/refund")
-
-    # free public tools
-    assert client.post("/tools/sample-size", json={"design": "two_means", "params": {"effect_size": 0.5}}).status_code == 200
-    hit.add("/tools/sample-size")
-    assert client.post("/tools/diagnostic", json={"tp": 90, "fp": 10, "fn": 20, "tn": 80}).status_code == 200
-    hit.add("/tools/diagnostic")
-    assert client.post("/tools/meta-analysis", json={"studies": [{"effect": 0.2, "se": 0.1}, {"effect": 0.4, "se": 0.15}]}).status_code == 200
-    hit.add("/tools/meta-analysis")
 
     declared = {
         pth for pth in app.openapi()["paths"]

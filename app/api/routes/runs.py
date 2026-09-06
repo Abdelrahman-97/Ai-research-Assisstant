@@ -14,6 +14,7 @@ from fastapi import (
     APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status,
 )
 from fastapi.responses import FileResponse, Response
+from pydantic import BaseModel
 
 from app.api.deps import get_current_user, get_verified_user
 from app.config import settings
@@ -316,6 +317,25 @@ async def set_format(
     )
     run.output_language = output_language if output_language in ("en", "ar") else "en"
     return repository.runs.save(run)
+
+
+class ToolEstimateRequest(BaseModel):
+    inputs: dict = {}
+
+
+@router.post("/{run_id}/tool-estimate", response_model=Run)
+def tool_estimate(run_id: str, body: ToolEstimateRequest,
+                  user: User = Depends(get_current_user)) -> Run:
+    """Price a tool job (meta-analysis / sample-size / diagnostic) + store inputs."""
+    run = _get_owned_run(run_id, user)
+    return _guard(lambda: orchestrator.estimate_tool(run, body.inputs))
+
+
+@router.post("/{run_id}/tool-compute", response_model=Run)
+def tool_compute(run_id: str, user: User = Depends(get_current_user)) -> Run:
+    """After payment: run the tool engine and produce the downloadable report."""
+    run = _get_owned_run(run_id, user)
+    return _guard(lambda: orchestrator.compute_tool(run))
 
 
 @router.post("/{run_id}/plan", response_model=Run)

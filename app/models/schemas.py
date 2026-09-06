@@ -32,8 +32,15 @@ class Language(str, Enum):
 
 
 class TaskType(str, Enum):
-    # Only one task is offered in v1, but the model is ready for more.
-    results_section = "results_section"
+    results_section = "results_section"   # the AI results-section pipeline
+    meta_analysis = "meta_analysis"       # comprehensive meta-analysis (paid tool)
+    sample_size = "sample_size"           # sample-size / power (paid tool)
+    diagnostic = "diagnostic"             # diagnostic accuracy from a 2x2 (paid tool)
+
+
+# Task types that are deterministic "tool" jobs (structured inputs → computed
+# report), as opposed to the AI results-section pipeline.
+TOOL_TASKS = {TaskType.meta_analysis, TaskType.sample_size, TaskType.diagnostic}
 
 
 class Scope(str, Enum):
@@ -73,10 +80,14 @@ class SignupRequest(BaseModel):
 
 
 class CreateRunRequest(BaseModel):
-    """Task + scope are chosen when starting each job."""
+    """Task + scope are chosen when starting each job.
+
+    Scope only matters for the results-section pipeline; the tool jobs
+    (meta-analysis, sample-size, diagnostic) ignore it, so it defaults.
+    """
 
     task: TaskType = TaskType.results_section
-    scope: Scope
+    scope: Scope = Scope.studies
 
 
 class LoginRequest(BaseModel):
@@ -370,6 +381,11 @@ class Run(BaseModel):
     format_spec: FormatSpec | None = None
     # language of the generated Results prose: "en" | "ar"
     output_language: str = "en"
+
+    # tool jobs (meta-analysis / sample-size / diagnostic): structured inputs the
+    # user supplied and the computed result (rendered into the report).
+    tool_inputs: dict | None = None
+    tool_result: dict | None = None
 
     # outputs
     results_markdown: str | None = None

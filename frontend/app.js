@@ -231,9 +231,9 @@ async function renderDashboard() {
           <p class="sub">Choose an analysis to begin.</p>
           <div class="feature-grid">
             <button class="feature primary" id="fNew"><div class="f-ic">📝</div><div class="f-title">Results section</div><div class="f-desc">Upload data → AI plan → full write-up (Word/PDF)</div></button>
-            <a class="feature" href="calculators.html#meta"><div class="f-ic">📊</div><div class="f-title">Meta-analysis</div><div class="f-desc">Pool studies · heterogeneity · bias · subgroups</div></a>
-            <a class="feature" href="calculators.html#samplesize"><div class="f-ic">🔢</div><div class="f-title">Sample size</div><div class="f-desc">Power & sample-size for every common design</div></a>
-            <a class="feature" href="calculators.html#diagnostic"><div class="f-ic">🩺</div><div class="f-title">Diagnostic accuracy</div><div class="f-desc">Sensitivity · specificity · PPV/NPV · LRs</div></a>
+            <button class="feature" data-tool="meta_analysis"><div class="f-ic">📊</div><div class="f-title">Meta-analysis</div><div class="f-desc">Pool studies · heterogeneity · bias · subgroups</div></button>
+            <button class="feature" data-tool="sample_size"><div class="f-ic">🔢</div><div class="f-title">Sample size</div><div class="f-desc">Power & sample-size for every common design</div></button>
+            <button class="feature" data-tool="diagnostic"><div class="f-ic">🩺</div><div class="f-title">Diagnostic accuracy</div><div class="f-desc">Sensitivity · specificity · PPV/NPV · LRs</div></button>
           </div>
         </div>
         <div class="card">
@@ -245,14 +245,13 @@ async function renderDashboard() {
       <aside class="shell-side">
         <nav class="sidenav">
           <h4>Analyses</h4>
-          <button class="navlink active" id="navNew"><span class="ic">📝</span> New Results section</button>
-          <a class="navlink" href="calculators.html#meta"><span class="ic">📊</span> Meta-analysis</a>
-          <a class="navlink" href="calculators.html#samplesize"><span class="ic">🔢</span> Sample size</a>
-          <a class="navlink" href="calculators.html#diagnostic"><span class="ic">🩺</span> Diagnostic accuracy</a>
+          <button class="navlink active" id="navNew"><span class="ic">📝</span> Results section</button>
+          <button class="navlink" data-tool="meta_analysis"><span class="ic">📊</span> Meta-analysis</button>
+          <button class="navlink" data-tool="sample_size"><span class="ic">🔢</span> Sample size</button>
+          <button class="navlink" data-tool="diagnostic"><span class="ic">🩺</span> Diagnostic accuracy</button>
         </nav>
         <nav class="sidenav">
           <h4>More</h4>
-          <a class="navlink" href="calculators.html"><span class="ic">🧮</span> All free tools</a>
           <a class="navlink" href="about.html"><span class="ic">ℹ️</span> About Neura</a>
           <button class="navlink" id="navDelete" style="color:var(--err);"><span class="ic">🗑️</span> Delete account</button>
         </nav>
@@ -262,6 +261,8 @@ async function renderDashboard() {
   const goNew = () => { state.view = "newtask"; render(); };
   document.getElementById("fNew").onclick = goNew;
   document.getElementById("navNew").onclick = goNew;
+  document.querySelectorAll("[data-tool]").forEach(el =>
+    el.onclick = () => startTool(el.dataset.tool));
   document.getElementById("navDelete").onclick = async () => {
     if (!confirm("Permanently delete your account, all jobs, and all files? This cannot be undone.")) return;
     try {
@@ -366,8 +367,11 @@ function assistantPanel(r) {
     </div>`;
 }
 
+const TOOL_TASKS = ["meta_analysis", "sample_size", "diagnostic"];
+
 function renderRun() {
   const r = state.run;
+  if (TOOL_TASKS.includes(r.task)) { renderToolRun(); return; }
   let inner;
   switch (r.status) {
     case "created": inner = viewUpload(); break;
@@ -446,9 +450,13 @@ function viewPay() {
   const fees = total - (q.amount_egp || 0);
   const feeRow = fees > 0
     ? `<li><span class="k">payment processing fees</span><span class="v">${fees} EGP</span></li>` : "";
+  const isTool = TOOL_TASKS.includes(state.run.task);
+  const subLine = isTool
+    ? "A complete, cited report you can download as Word and PDF."
+    : `Estimated ${q.estimated_tests ?? "?"} statistical test(s) · ${q.word_count ?? "?"} words.`;
   return `
     <h2>Your price</h2>
-    <p class="sub">Estimated ${q.estimated_tests ?? "?"} statistical test(s) · ${q.word_count ?? "?"} words.</p>
+    <p class="sub">${subLine}</p>
     <div class="price-total">${total} <small>EGP</small></div>
     <ul class="breakdown">${rows}${feeRow}</ul>
     <label class="agree">
@@ -459,7 +467,7 @@ function viewPay() {
     </label>
     <div class="btn-row">
       <button id="payBtn" class="btn btn-primary" disabled>Proceed to payment</button>
-      <button id="reEstimateBtn" class="btn btn-ghost">Change word count</button>
+      <button id="reEstimateBtn" class="btn btn-ghost">${isTool ? "Edit inputs" : "Change word count"}</button>
     </div>
     <p class="muted-note">After paying, this page updates automatically once the payment is confirmed.</p>`;
 }
@@ -603,6 +611,215 @@ function viewBusy(msg) {
   return `<div class="center"><div class="spinner-lg"></div><p class="sub">${esc(msg)}</p></div>`;
 }
 
+/* ============================ Paid tool jobs ============================ */
+const TOOL_META = {
+  meta_analysis: ["📊", "Meta-analysis"],
+  sample_size: ["🔢", "Sample-size calculation"],
+  diagnostic: ["🩺", "Diagnostic accuracy"],
+};
+const SS_FIELDS = {
+  two_means: [["effect_size", "Effect size (Cohen's d)", "0.5", "Small 0.2 · medium 0.5 · large 0.8"]],
+  two_proportions: [["p1", "Proportion in group 1", "0.5", "e.g. 0.50 = 50%"], ["p2", "Proportion in group 2", "0.3", ""]],
+  anova: [["effect_size", "Effect size (Cohen's f)", "0.25", "Small 0.10 · medium 0.25 · large 0.40"], ["k_groups", "Number of groups", "3", ""]],
+  correlation: [["r", "Expected correlation (r)", "0.3", "Small 0.1 · medium 0.3 · large 0.5"]],
+  paired_means: [["effect_size", "Effect size (dz)", "0.5", "Standardized mean of the paired differences"]],
+  one_mean: [["effect_size", "Effect size (Cohen's d)", "0.5", ""]],
+  one_proportion: [["p1", "Expected proportion", "0.6", ""], ["p0", "Reference proportion", "0.5", ""]],
+  chi_square: [["effect_size", "Effect size (Cohen's w)", "0.3", "Small 0.1 · medium 0.3 · large 0.5"], ["df", "Degrees of freedom", "2", ""]],
+};
+
+async function startTool(task) {
+  try {
+    const run = await api("/runs", { method: "POST", body: { task } });
+    state.run = run; state.runId = run.id; state.view = "run"; render();
+  } catch (e) { toast(e.message, true); }
+}
+
+function viewToolInput(task) {
+  if (task === "sample_size") {
+    return `
+      <p class="sub">Work out how many participants you need for a target statistical power — or the power you'd achieve for a given sample. You'll get a clear, cited report.</p>
+      <label>What are you comparing?</label>
+      <select id="ssDesign">
+        <option value="two_means">Two groups — compare means (t-test)</option>
+        <option value="paired_means">Paired / before–after means</option>
+        <option value="one_mean">One mean vs a reference value</option>
+        <option value="two_proportions">Two groups — compare proportions (%)</option>
+        <option value="one_proportion">One proportion vs a reference</option>
+        <option value="anova">More than two groups (ANOVA)</option>
+        <option value="correlation">A correlation</option>
+        <option value="chi_square">A chi-square test</option>
+      </select>
+      <div id="ssFields"></div>
+      <div style="display:flex;gap:12px;">
+        <div style="flex:1;"><label>Significance (alpha)</label><input id="ssAlpha" type="number" step="0.01" value="0.05" /><div class="muted-note">Usually 0.05.</div></div>
+        <div style="flex:1;"><label>Power</label><input id="ssPower" type="number" step="0.05" value="0.80" /><div class="muted-note">Usually 0.80 (80%).</div></div>
+      </div>
+      <label>Expected drop-out (optional)</label>
+      <input id="ssDrop" type="number" step="0.05" value="0" /><div class="muted-note">e.g. 0.20 to enrol 20% extra for attrition.</div>
+      <div class="btn-row"><button id="toolEstimateBtn" class="btn btn-primary">Continue to price</button></div>`;
+  }
+  if (task === "diagnostic") {
+    return `
+      <p class="sub">Enter your 2×2 counts comparing the test against the reference ("gold") standard. You'll get sensitivity, specificity, predictive values and likelihood ratios with 95% confidence intervals — explained in plain language.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:130px;"><label>True positives (TP)</label><input id="dTP" type="number" value="90" /><div class="muted-note">Test +, disease present</div></div>
+        <div style="flex:1;min-width:130px;"><label>False positives (FP)</label><input id="dFP" type="number" value="10" /><div class="muted-note">Test +, disease absent</div></div>
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:130px;"><label>False negatives (FN)</label><input id="dFN" type="number" value="20" /><div class="muted-note">Test −, disease present</div></div>
+        <div style="flex:1;min-width:130px;"><label>True negatives (TN)</label><input id="dTN" type="number" value="80" /><div class="muted-note">Test −, disease absent</div></div>
+      </div>
+      <div class="btn-row"><button id="toolEstimateBtn" class="btn btn-primary">Continue to price</button></div>`;
+  }
+  // meta-analysis
+  return `
+    <p class="sub">Pool results across studies. Choose your effect measure, paste your studies, and you'll get a full report: pooled effect (fixed + random), heterogeneity (I², τ²), subgroups, meta-regression, cumulative analysis, and publication-bias tests — all cited.</p>
+    <label>Effect measure</label>
+    <select id="mMeasure">
+      <option value="generic">Generic (effect + standard error)</option>
+      <option value="or">Odds ratio (from 2×2 counts)</option>
+      <option value="rr">Risk ratio (from 2×2 counts)</option>
+      <option value="rd">Risk difference (from 2×2 counts)</option>
+      <option value="peto">Peto odds ratio (from 2×2 counts)</option>
+      <option value="md">Mean difference (from group means)</option>
+      <option value="smd">Standardized mean difference / Hedges g</option>
+      <option value="fisher_z">Correlation (r)</option>
+      <option value="proportion">Single proportion</option>
+      <option value="hr">Hazard ratio (log-HR + SE)</option>
+    </select>
+    <div id="mHelp" class="muted-note" style="margin-top:6px;"></div>
+    <label>Studies — one per line</label>
+    <textarea id="mData" rows="7" placeholder=""></textarea>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;">
+      <div style="flex:1;min-width:150px;"><label>Model</label>
+        <select id="mModel"><option value="random">Random effects</option><option value="fixed">Fixed effect</option></select></div>
+      <div style="flex:1;min-width:150px;"><label>Between-study variance (τ²)</label>
+        <select id="mTau"><option value="DL">DerSimonian-Laird</option><option value="PM">Paule-Mandel</option><option value="REML">REML</option></select></div>
+    </div>
+    <label class="agree"><input type="checkbox" id="mHksj" /> <span>Use Hartung-Knapp adjustment (more conservative CIs; good for few studies)</span></label>
+    <div class="btn-row"><button id="toolEstimateBtn" class="btn btn-primary">Continue to price</button></div>`;
+}
+
+const META_HELP = {
+  generic: "Columns: name, effect, standard_error, group(optional). Example: Smith 2019, 0.20, 0.10, adults",
+  or: "Columns: name, events1, n1, events2, n2, group(optional). Example: Smith 2019, 20, 100, 30, 100, adults",
+  rr: "Columns: name, events1, n1, events2, n2, group(optional).",
+  rd: "Columns: name, events1, n1, events2, n2, group(optional).",
+  peto: "Columns: name, events1, n1, events2, n2, group(optional).",
+  md: "Columns: name, n1, mean1, sd1, n2, mean2, sd2, group(optional).",
+  smd: "Columns: name, n1, mean1, sd1, n2, mean2, sd2, group(optional).",
+  fisher_z: "Columns: name, r, n, group(optional). Example: Smith 2019, 0.3, 50, adults",
+  proportion: "Columns: name, events, total, group(optional). Example: Smith 2019, 25, 100",
+  hr: "Columns: name, logHR, standard_error, group(optional). Enter the natural log of the HR.",
+};
+
+function _num(x) { const v = parseFloat(x); return isNaN(v) ? null : v; }
+
+function gatherToolInputs(task) {
+  if (task === "sample_size") {
+    const design = document.getElementById("ssDesign").value;
+    const params = { alpha: _num(document.getElementById("ssAlpha").value),
+                     power: _num(document.getElementById("ssPower").value) };
+    const drop = _num(document.getElementById("ssDrop").value); if (drop) params.dropout = drop;
+    SS_FIELDS[design].forEach(([id]) => {
+      const v = _num(document.getElementById("ss_" + id).value);
+      params[id] = id === "k_groups" || id === "df" ? Math.round(v) : v;
+    });
+    return { design, params };
+  }
+  if (task === "diagnostic") {
+    return { tp: parseInt(document.getElementById("dTP").value, 10),
+             fp: parseInt(document.getElementById("dFP").value, 10),
+             fn: parseInt(document.getElementById("dFN").value, 10),
+             tn: parseInt(document.getElementById("dTN").value, 10) };
+  }
+  // meta
+  const measure = document.getElementById("mMeasure").value;
+  const lines = document.getElementById("mData").value.split("\n").map(l => l.trim()).filter(Boolean);
+  const studies = lines.map(line => {
+    const p = line.split(",").map(s => s.trim());
+    const o = { name: p[0] };
+    if (measure === "generic") { o.effect = _num(p[1]); o.se = _num(p[2]); o.group = p[3] || null; }
+    else if (measure === "hr") { o.effect = _num(p[1]); o.se = _num(p[2]); o.group = p[3] || null; }
+    else if (["or", "rr", "rd", "peto"].includes(measure)) { o.e1 = _num(p[1]); o.n1 = _num(p[2]); o.e2 = _num(p[3]); o.n2 = _num(p[4]); o.group = p[5] || null; }
+    else if (["md", "smd"].includes(measure)) { o.n1 = _num(p[1]); o.m1 = _num(p[2]); o.sd1 = _num(p[3]); o.n2 = _num(p[4]); o.m2 = _num(p[5]); o.sd2 = _num(p[6]); o.group = p[7] || null; }
+    else if (measure === "fisher_z") { o.r = _num(p[1]); o.n = _num(p[2]); o.group = p[3] || null; }
+    else if (measure === "proportion") { o.events = _num(p[1]); o.total = _num(p[2]); o.group = p[3] || null; }
+    return o;
+  });
+  return { studies, measure, model: document.getElementById("mModel").value,
+           tau2_method: document.getElementById("mTau").value,
+           hksj: document.getElementById("mHksj").checked,
+           subgroups: true, meta_regression: false, cumulative: false, bias_tests: true };
+}
+
+function renderToolRun() {
+  const r = state.run;
+  const [ic, name] = TOOL_META[r.task] || ["", "Analysis"];
+  let inner;
+  switch (r.status) {
+    case "created": inner = viewToolInput(r.task); break;
+    case "awaiting_payment": inner = viewPay(); break;
+    case "paid":
+    case "writing": inner = viewBusy("Computing your analysis and preparing the report…"); break;
+    case "completed":
+    case "accepted": inner = viewResults(); break;
+    case "failed":
+      inner = `<p><span class="pill err">Couldn't compute</span></p><p class="sub">${esc(r.error || "")}</p>
+        <div class="btn-row"><button id="toolRetry" class="btn btn-primary">Edit inputs & try again</button></div>`;
+      break;
+    default: inner = viewBusy("Working…");
+  }
+  app.innerHTML = `
+    <div class="card">
+      <button class="link" id="toDash">← My jobs</button>
+      <h1 style="margin-top:10px;">${ic} ${name}</h1>
+      ${inner}
+    </div>`;
+  document.getElementById("toDash").onclick = () => { state.view = "dashboard"; render(); };
+  bindRunHandlers();       // wires agree / pay / download for the pay + results views
+  bindToolHandlers();
+  if (r.status === "paid") step2Compute();
+  if (window.NEURA_I18N) NEURA_I18N.apply();
+}
+
+function bindToolHandlers() {
+  const r = state.run;
+  const ssDesign = document.getElementById("ssDesign");
+  if (ssDesign) {
+    const draw = () => {
+      document.getElementById("ssFields").innerHTML = SS_FIELDS[ssDesign.value].map(([id, label, val, hint]) =>
+        `<label>${label}</label><input id="ss_${id}" type="number" step="any" value="${val}" />` +
+        (hint ? `<div class="muted-note">${hint}</div>` : "")).join("");
+    };
+    ssDesign.onchange = draw; draw();
+  }
+  const mMeasure = document.getElementById("mMeasure");
+  if (mMeasure) {
+    const help = () => { document.getElementById("mHelp").textContent = META_HELP[mMeasure.value] || ""; };
+    mMeasure.onchange = help; help();
+  }
+  const est = document.getElementById("toolEstimateBtn");
+  if (est) est.onclick = () => step("toolEstimateBtn", async () => {
+    const inputs = gatherToolInputs(r.task);
+    state.run = await api(`/runs/${r.id}/tool-estimate`, { method: "POST", body: { inputs } });
+    render();
+  });
+  const retry = document.getElementById("toolRetry");
+  if (retry) retry.onclick = () => { state.run = { ...state.run, status: "created" }; render(); };
+}
+
+async function step2Compute() {
+  if (state._computing === state.runId) return;   // guard against double-fire on re-render
+  state._computing = state.runId;
+  try {
+    state.run = await api(`/runs/${state.runId}/tool-compute`, { method: "POST" });
+  } catch (e) { toast(e.message, true); }
+  state._computing = null;
+  render();
+}
+
 /* ---- handlers for the run sub-views ---- */
 function busy(btn, on) {
   if (!btn) return;
@@ -650,8 +867,9 @@ function bindRunHandlers() {
 
   const reEstimateBtn = document.getElementById("reEstimateBtn");
   if (reEstimateBtn) reEstimateBtn.onclick = async () => {
-    // Go back to the word-count screen by treating the run as uploaded again (client-side).
-    state.run = { ...state.run, status: "uploaded" }; render();
+    // Back to the input screen (tool jobs → "created"; results-section → "uploaded").
+    const back = TOOL_TASKS.includes(state.run.task) ? "created" : "uploaded";
+    state.run = { ...state.run, status: back }; render();
   };
 
   const agree = document.getElementById("agree");

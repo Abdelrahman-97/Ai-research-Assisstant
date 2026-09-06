@@ -104,6 +104,10 @@ class Settings(BaseSettings):
     # results; "full" = an expert performs the whole analysis (longer turnaround).
     price_consultation_review_egp: int = 500
     price_consultation_full_egp: int = 3000
+    # Flat prices for the deterministic tool jobs (paid, pay-per-use).
+    price_meta_analysis_egp: int = 750
+    price_sample_size_egp: int = 150
+    price_diagnostic_egp: int = 150
 
     # --- Analyst assistant (free-text control layer) ---
     assistant_enabled: bool = True

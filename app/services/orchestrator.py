@@ -26,6 +26,7 @@ from pathlib import Path
 
 from app.config import settings
 from app.models.schemas import (
+    TOOL_TASKS,
     Language,
     PriceQuote,
     Run,
@@ -35,14 +36,18 @@ from app.models.schemas import (
     TestConfirmation,
 )
 from app.services import (
+    diagnostic,
     evidence,
     formatting,
     integrity_checker,
+    meta_analysis,
     planner,
     pricing,
     report_writer,
     results_writer,
+    sample_size,
     stats_executor,
+    tool_report,
 )
 from app.store import blobs, repository
 
@@ -102,6 +107,82 @@ def estimate(
     run.assistant_allowance = quote.assistant_allowance
     run.consultation = quote.consultation
     run.status = RunStatus.awaiting_payment
+    return _touch(run)
+
+
+_TOOL_PRICE = {
+    TaskType.meta_analysis: "price_meta_analysis_egp",
+    TaskType.sample_size: "price_sample_size_egp",
+    TaskType.diagnostic: "price_diagnostic_egp",
+}
+_TOOL_LABEL = {
+    TaskType.meta_analysis: "meta-analysis",
+    TaskType.sample_size: "sample-size calculation",
+    TaskType.diagnostic: "diagnostic accuracy",
+}
+
+
+def estimate_tool(run: Run, inputs: dict) -> Run:
+    """Price a tool job (flat per type) and store the user's structured inputs."""
+    if run.task not in TOOL_TASKS:
+        raise PipelineError("This job is not a tool job.")
+    run.tool_inputs = inputs or {}
+    price = int(getattr(settings, _TOOL_PRICE[run.task]))
+    customer = (
+        pricing.gross_up_for_fees(price)
+        if settings.easykash_pass_fees_to_customer else price
+    )
+    run.quote = PriceQuote(
+        amount_egp=price, customer_total_egp=customer,
+        breakdown={_TOOL_LABEL[run.task]: price},
+    )
+    run.status = RunStatus.awaiting_payment
+    return _touch(run)
+
+
+def compute_tool(run: Run) -> Run:
+    """After payment: run the engine, render an explained report, export docx+pdf."""
+    _require_paid(run)
+    if run.task not in TOOL_TASKS:
+        raise PipelineError("This job is not a tool job.")
+    inp = run.tool_inputs or {}
+    run.status = RunStatus.writing
+    _touch(run)
+    try:
+        if run.task == TaskType.sample_size:
+            result = sample_size.calculate(inp.get("design", ""), inp.get("params", {}))
+        elif run.task == TaskType.diagnostic:
+            result = diagnostic.accuracy_2x2(
+                int(inp.get("tp", 0)), int(inp.get("fp", 0)),
+                int(inp.get("fn", 0)), int(inp.get("tn", 0)),
+            )
+        elif run.task == TaskType.meta_analysis:
+            opts = {k: inp[k] for k in (
+                "measure", "model", "tau2_method", "hksj", "subgroups",
+                "meta_regression", "cumulative", "bias_tests") if k in inp}
+            result = meta_analysis.analyze(inp.get("studies", []), **opts)
+        else:
+            raise PipelineError("Unsupported tool.")
+    except (sample_size.SampleSizeError, diagnostic.DiagnosticError,
+            meta_analysis.MetaAnalysisError, KeyError, ValueError, TypeError) as exc:
+        run.status = RunStatus.failed
+        run.error = f"Could not compute: {exc}"
+        return _touch(run)
+
+    run.tool_result = result
+    markdown = tool_report.render(run.task.value, inp, result)
+    fmt = formatting.resolve(run.format_spec)
+    out_dir = Path(settings.data_dir) / "outputs"
+    docx_path = out_dir / f"results_{run.id}.docx"
+    pdf_path = out_dir / f"results_{run.id}.pdf"
+    report_writer.markdown_to_docx(markdown, [], docx_path, fmt=fmt)
+    report_writer.markdown_to_pdf(markdown, [], pdf_path, fmt=fmt)
+    run.docx_blob_id = blobs.put(run.id, kind="docx", filename=docx_path.name, content=docx_path.read_bytes())
+    run.pdf_blob_id = blobs.put(run.id, kind="pdf", filename=pdf_path.name, content=pdf_path.read_bytes())
+    run.results_markdown = markdown
+    run.docx_path = str(docx_path)
+    run.pdf_path = str(pdf_path)
+    run.status = RunStatus.completed
     return _touch(run)
 
 
