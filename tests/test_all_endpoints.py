@@ -127,6 +127,14 @@ def test_every_endpoint(tmp_path):
         client.get(p); hit.add(p)
     client.post("/admin/runs/x/refund"); hit.add("/admin/runs/{run_id}/refund")
 
+    # free public tools
+    assert client.post("/tools/sample-size", json={"design": "two_means", "params": {"effect_size": 0.5}}).status_code == 200
+    hit.add("/tools/sample-size")
+    assert client.post("/tools/diagnostic", json={"tp": 90, "fp": 10, "fn": 20, "tn": 80}).status_code == 200
+    hit.add("/tools/diagnostic")
+    assert client.post("/tools/meta-analysis", json={"studies": [{"effect": 0.2, "se": 0.1}, {"effect": 0.4, "se": 0.15}]}).status_code == 200
+    hit.add("/tools/meta-analysis")
+
     declared = {
         pth for pth in app.openapi()["paths"]
         if not any(x in pth for x in ("openapi", "docs", "redoc"))
