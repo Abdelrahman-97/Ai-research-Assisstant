@@ -65,6 +65,7 @@ class RunStatus(str, Enum):
 class SignupRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
+    name: str | None = Field(default=None, max_length=120)
     # Task + scope are now chosen per-job (at run creation), so they are optional
     # here and only act as the account's default.
     task: TaskType = TaskType.results_section
@@ -103,6 +104,7 @@ class EmailRequest(BaseModel):
 class UserPublic(BaseModel):
     id: str
     email: EmailStr
+    name: str | None = None
     task: TaskType
     scope: Scope
     has_paid: bool = False

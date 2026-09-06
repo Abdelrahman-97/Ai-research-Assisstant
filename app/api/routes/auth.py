@@ -59,6 +59,7 @@ def signup(request: Request, body: SignupRequest) -> TokenResponse:
     user = User(
         id=repository.new_id(),
         email=body.email,
+        name=(body.name.strip() if body.name else None),
         task=body.task,
         scope=body.scope,
         password_hash=hash_password(body.password),

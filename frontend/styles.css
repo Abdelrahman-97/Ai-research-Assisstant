@@ -101,6 +101,7 @@ body {
 
 /* Layout */
 .app { max-width: 760px; margin: 0 auto; padding: 32px 20px 72px; }
+.app.wide { max-width: 1080px; }
 .app { padding-bottom: calc(72px + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch; }
 .card {
   background: var(--surface); border: 1px solid var(--line);
@@ -242,6 +243,41 @@ pre.code {
 .wa-fab svg { display: block; }
 @media (max-width: 520px) { .wa-fab span { display: none; } .wa-fab { padding: 14px; } }
 .muted-note { font-size: 13px; color: var(--muted); margin-top: 12px; }
+
+/* Research-workspace shell: main content + right feature sidebar */
+.shell { display: grid; grid-template-columns: 1fr 300px; gap: 20px; align-items: start; }
+.shell-main { min-width: 0; }
+.shell-side { position: sticky; top: 84px; display: flex; flex-direction: column; gap: 10px; }
+.sidenav { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); }
+.sidenav h4 { font-family: var(--serif); font-size: 14px; margin: 4px 6px 10px; color: var(--muted); font-weight: 600; }
+.navlink {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: inherit;
+  padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid transparent;
+  background: transparent; color: var(--ink); font: inherit; font-size: 14.5px; cursor: pointer;
+  text-decoration: none; transition: background .15s var(--ease), border-color .15s var(--ease);
+}
+.navlink:hover { background: var(--accent-soft); }
+.navlink.active { background: var(--accent-soft); border-color: var(--accent); font-weight: 500; }
+.navlink .ic { width: 22px; text-align: center; font-size: 16px; }
+
+/* Feature cards grid on the dashboard */
+.feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 6px; }
+.feature {
+  display: block; text-align: inherit; background: var(--surface-2); border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm); padding: 18px; cursor: pointer; font: inherit; color: var(--ink);
+  transition: transform .15s var(--ease), border-color .15s var(--ease), box-shadow .15s var(--ease);
+}
+.feature:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: var(--shadow); }
+.feature .f-ic { font-size: 22px; }
+.feature .f-title { font-weight: 600; margin-top: 8px; }
+.feature .f-desc { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+.feature.primary { background: var(--accent-soft); border-color: var(--accent); }
+
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; }
+  .shell-side { position: static; order: -1; }   /* nav on top on phones */
+  .feature-grid { grid-template-columns: 1fr; }
+}
 
 /* Analyst assistant panel */
 .asst-card { margin-top: 16px; }

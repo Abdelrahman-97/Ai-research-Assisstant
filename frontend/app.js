@@ -48,7 +48,7 @@ function toast(msg, isErr = false) {
 function esc(s) { return String(s ?? "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
 
 function syncTopbar() {
-  document.getElementById("userEmail").textContent = state.user ? state.user.email : "";
+  document.getElementById("userEmail").textContent = state.user ? (state.user.name || state.user.email) : "";
   document.getElementById("logoutBtn").classList.toggle("hidden", !state.user);
 }
 
@@ -116,6 +116,10 @@ function renderAuth() {
     <div class="card" style="max-width:440px;margin:40px auto;">
       <h1 id="authTitle">Welcome back</h1>
       <p class="sub" id="authSub">Log in to continue.</p>
+      <div id="nameWrap" class="hidden">
+        <label>Name</label>
+        <input id="signupName" type="text" placeholder="Your name" />
+      </div>
       <label>Email</label>
       <input id="email" type="email" placeholder="you@example.com" />
       <label>Password</label>
@@ -147,6 +151,7 @@ function renderAuth() {
     document.getElementById("switchText").textContent = m === "login" ? "No account?" : "Already have an account?";
     document.getElementById("switchMode").textContent = m === "login" ? "Sign up" : "Log in";
     document.getElementById("scopeWrap").classList.toggle("hidden", m === "login");
+    document.getElementById("nameWrap").classList.toggle("hidden", m === "login");
     document.getElementById("forgotWrap").classList.toggle("hidden", m !== "login");
   };
   document.getElementById("switchMode").onclick = () => setMode(mode === "login" ? "signup" : "login");
@@ -160,7 +165,8 @@ function renderAuth() {
       const path = mode === "login" ? "/auth/login" : "/auth/signup";
       const body = mode === "login"
         ? { email, password }
-        : { email, password, scope: document.getElementById("signupScope").value };
+        : { email, password, scope: document.getElementById("signupScope").value,
+            name: document.getElementById("signupName").value.trim() || null };
       const data = await api(path, { method: "POST", body });
       state.token = data.access_token; state.user = data.user;
       localStorage.setItem("ra_token", state.token);
@@ -218,20 +224,45 @@ async function renderDashboard() {
 
   app.innerHTML = `
     ${verifyBanner}
-    <div class="card">
-      <h1>Your workspace</h1>
-      <p class="sub">Start a new Results section, or continue a job.</p>
-      <button id="newTaskBtn" class="btn btn-primary">+ New Results section</button>
-    </div>
-    <div class="card">
-      <h2>My jobs</h2>
-      <p class="sub">Files are kept 30 days after you accept the results.</p>
-      <div id="runsList" style="margin-top:12px;">${items}</div>
-    </div>
-    <p class="muted-note center"><button class="link" id="deleteAccount" style="color:var(--err);">Delete my account and all data</button></p>`;
+    <div class="shell">
+      <div class="shell-main">
+        <div class="card">
+          <h1>${state.user && state.user.name ? "Welcome, " + esc(state.user.name.split(" ")[0]) : "Research workspace"}</h1>
+          <p class="sub">Choose an analysis to begin.</p>
+          <div class="feature-grid">
+            <button class="feature primary" id="fNew"><div class="f-ic">📝</div><div class="f-title">Results section</div><div class="f-desc">Upload data → AI plan → full write-up (Word/PDF)</div></button>
+            <a class="feature" href="calculators.html#meta"><div class="f-ic">📊</div><div class="f-title">Meta-analysis</div><div class="f-desc">Pool studies · heterogeneity · bias · subgroups</div></a>
+            <a class="feature" href="calculators.html#samplesize"><div class="f-ic">🔢</div><div class="f-title">Sample size</div><div class="f-desc">Power & sample-size for every common design</div></a>
+            <a class="feature" href="calculators.html#diagnostic"><div class="f-ic">🩺</div><div class="f-title">Diagnostic accuracy</div><div class="f-desc">Sensitivity · specificity · PPV/NPV · LRs</div></a>
+          </div>
+        </div>
+        <div class="card">
+          <h2>My jobs</h2>
+          <p class="sub">Files are kept 30 days after you accept the results.</p>
+          <div id="runsList" style="margin-top:12px;">${items}</div>
+        </div>
+      </div>
+      <aside class="shell-side">
+        <nav class="sidenav">
+          <h4>Analyses</h4>
+          <button class="navlink active" id="navNew"><span class="ic">📝</span> New Results section</button>
+          <a class="navlink" href="calculators.html#meta"><span class="ic">📊</span> Meta-analysis</a>
+          <a class="navlink" href="calculators.html#samplesize"><span class="ic">🔢</span> Sample size</a>
+          <a class="navlink" href="calculators.html#diagnostic"><span class="ic">🩺</span> Diagnostic accuracy</a>
+        </nav>
+        <nav class="sidenav">
+          <h4>More</h4>
+          <a class="navlink" href="calculators.html"><span class="ic">🧮</span> All free tools</a>
+          <a class="navlink" href="about.html"><span class="ic">ℹ️</span> About Neura</a>
+          <button class="navlink" id="navDelete" style="color:var(--err);"><span class="ic">🗑️</span> Delete account</button>
+        </nav>
+      </aside>
+    </div>`;
 
-  document.getElementById("newTaskBtn").onclick = () => { state.view = "newtask"; render(); };
-  document.getElementById("deleteAccount").onclick = async () => {
+  const goNew = () => { state.view = "newtask"; render(); };
+  document.getElementById("fNew").onclick = goNew;
+  document.getElementById("navNew").onclick = goNew;
+  document.getElementById("navDelete").onclick = async () => {
     if (!confirm("Permanently delete your account, all jobs, and all files? This cannot be undone.")) return;
     try {
       await api("/auth/me", { method: "DELETE" });
@@ -890,6 +921,7 @@ function statusPill(s) {
 function render() {
   syncTopbar();
   if (!state.token) { state.view = "auth"; }
+  app.classList.toggle("wide", state.view === "dashboard");
   switch (state.view) {
     case "auth": renderAuth(); break;
     case "forgot": renderForgot(); break;
