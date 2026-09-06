@@ -141,7 +141,11 @@ function renderAuth() {
       <p class="muted-note center" id="forgotWrap">
         <button class="link" id="forgotLink">Forgot password?</button>
       </p>
-    </div>`;
+    </div>
+    <p class="muted-note center" style="max-width:440px;margin:-6px auto 40px;">
+      Built by a registered physiotherapist &amp; published researcher — HCPC · AHPRA · NZ · Cairo University.
+      <a class="link" href="about.html" target="_blank">About the founder →</a>
+    </p>`;
 
   const setMode = (m) => {
     mode = m;
