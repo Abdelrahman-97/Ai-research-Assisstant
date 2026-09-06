@@ -666,14 +666,31 @@ function viewToolInput(task) {
   }
   if (task === "diagnostic") {
     return `
-      <p class="sub">Enter your 2×2 counts comparing the test against the reference ("gold") standard. You'll get sensitivity, specificity, predictive values and likelihood ratios with 95% confidence intervals — explained in plain language.</p>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:130px;"><label>True positives (TP)</label><input id="dTP" type="number" value="90" /><div class="muted-note">Test +, disease present</div></div>
-        <div style="flex:1;min-width:130px;"><label>False positives (FP)</label><input id="dFP" type="number" value="10" /><div class="muted-note">Test +, disease absent</div></div>
+      <p class="sub">Measure how well a test detects a condition. Provide either summary 2×2 counts, or raw scores per case to get a full ROC curve and AUC.</p>
+      <label>Data type</label>
+      <select id="dMode">
+        <option value="counts">2×2 counts (I already have TP/FP/FN/TN)</option>
+        <option value="roc">Raw scores + outcomes (compute ROC curve & AUC)</option>
+      </select>
+      <div id="d2x2">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:130px;"><label>True positives (TP)</label><input id="dTP" type="number" value="90" /><div class="muted-note">Test +, condition present</div></div>
+          <div style="flex:1;min-width:130px;"><label>False positives (FP)</label><input id="dFP" type="number" value="10" /><div class="muted-note">Test +, condition absent</div></div>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:130px;"><label>False negatives (FN)</label><input id="dFN" type="number" value="20" /><div class="muted-note">Test −, condition present</div></div>
+          <div style="flex:1;min-width:130px;"><label>True negatives (TN)</label><input id="dTN" type="number" value="80" /><div class="muted-note">Test −, condition absent</div></div>
+        </div>
       </div>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:130px;"><label>False negatives (FN)</label><input id="dFN" type="number" value="20" /><div class="muted-note">Test −, disease present</div></div>
-        <div style="flex:1;min-width:130px;"><label>True negatives (TN)</label><input id="dTN" type="number" value="80" /><div class="muted-note">Test −, disease absent</div></div>
+      <div id="dRaw" class="hidden">
+        <label>One case per line: <code>score, outcome</code> (outcome = 1 has the condition, 0 does not)</label>
+        <textarea id="dPairs" rows="7" placeholder="0.82, 1
+0.41, 0
+0.67, 1
+0.30, 0
+0.55, 1"></textarea>
+        <label class="agree"><input type="checkbox" id="dHigher" checked /> <span>Higher score = more likely to have the condition</span></label>
+        <p class="muted-note">You'll get the AUC (with 95% CI), the ROC curve, and the best cut-off (Youden's J) with its sensitivity/specificity.</p>
       </div>
       <div class="btn-row"><button id="toolEstimateBtn" class="btn btn-primary">Continue to price</button></div>`;
   }
@@ -739,6 +756,11 @@ function gatherToolInputs(task) {
     return { design, params };
   }
   if (task === "diagnostic") {
+    if (document.getElementById("dMode").value === "roc") {
+      const pairs = document.getElementById("dPairs").value.split("\n").map(l => l.trim()).filter(Boolean)
+        .map(l => { const parts = l.split(","); return [_num(parts[0]), parseInt((parts[1] || "").trim(), 10)]; });
+      return { pairs, higher_is_positive: document.getElementById("dHigher").checked };
+    }
     return { tp: parseInt(document.getElementById("dTP").value, 10),
              fp: parseInt(document.getElementById("dFP").value, 10),
              fn: parseInt(document.getElementById("dFN").value, 10),
@@ -813,6 +835,14 @@ function bindToolHandlers() {
         (hint ? `<div class="muted-note">${hint}</div>` : "")).join("");
     };
     ssDesign.onchange = draw; draw();
+  }
+  const dMode = document.getElementById("dMode");
+  if (dMode) {
+    const t = () => {
+      document.getElementById("d2x2").classList.toggle("hidden", dMode.value !== "counts");
+      document.getElementById("dRaw").classList.toggle("hidden", dMode.value !== "roc");
+    };
+    dMode.onchange = t; t();
   }
   const mMeasure = document.getElementById("mMeasure");
   if (mMeasure) {

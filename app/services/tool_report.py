@@ -176,12 +176,37 @@ def _meta(inp: dict, r: dict) -> str:
     return "\n".join(md) + _refs_block(r.get("references", []))
 
 
+def _diagnostic_roc(inp: dict, r: dict) -> str:
+    at = r["at_optimal_cutoff"]
+
+    def pct(m):
+        return "—" if m["value"] is None else f"{m['value'] * 100:.1f}%"
+
+    md = [
+        "# Diagnostic accuracy — ROC analysis\n",
+        f"Based on **{r['n']}** cases ({r['n_positive']} with the condition, "
+        f"{r['n_negative']} without), using each case's test score against the true outcome.\n",
+        "## Discrimination (AUC)\n",
+        f"- **Area under the ROC curve (AUC): {r['auc']:.3f}** (95% CI {r['auc_ci_low']:.3f}–{r['auc_ci_high']:.3f}).",
+        "AUC is the probability the test ranks a random true-positive case above a random true-negative "
+        "one. 0.5 = no better than chance; 0.7–0.8 acceptable; 0.8–0.9 excellent; > 0.9 outstanding.",
+        "\n## Best cut-off (Youden's J)\n",
+        f"- **Optimal cut-off: {r['youden_cutoff']}** — the threshold that jointly maximises sensitivity and specificity.",
+        f"- At this cut-off: **sensitivity {pct(at['sensitivity'])}**, **specificity {pct(at['specificity'])}**, "
+        f"PPV {pct(at['ppv'])}, NPV {pct(at['npv'])}, accuracy {pct(at['accuracy'])}.",
+        "\nThe ROC curve figure shows the full trade-off between sensitivity and false positives across all cut-offs.",
+    ]
+    from app.services import citations
+    refs = citations.refs(["altman1994", "deeks2004"])
+    return "\n".join(md) + _refs_block(refs)
+
+
 def render(task: str, inputs: dict, result: dict) -> str:
     """Return the explained Markdown report for a tool job."""
     if task == "sample_size":
         return _sample_size(inputs, result)
     if task == "diagnostic":
-        return _diagnostic(inputs, result)
+        return _diagnostic_roc(inputs, result) if result.get("roc_points") else _diagnostic(inputs, result)
     if task == "meta_analysis":
         return _meta(inputs, result)
     return "# Report\n\n(Unsupported tool.)"

@@ -153,10 +153,15 @@ def compute_tool(run: Run) -> Run:
         if run.task == TaskType.sample_size:
             result = sample_size.calculate(inp.get("design", ""), inp.get("params", {}))
         elif run.task == TaskType.diagnostic:
-            result = diagnostic.accuracy_2x2(
-                int(inp.get("tp", 0)), int(inp.get("fp", 0)),
-                int(inp.get("fn", 0)), int(inp.get("tn", 0)),
-            )
+            if inp.get("pairs"):
+                result = diagnostic.roc_auc(
+                    inp["pairs"], bool(inp.get("higher_is_positive", True))
+                )
+            else:
+                result = diagnostic.accuracy_2x2(
+                    int(inp.get("tp", 0)), int(inp.get("fp", 0)),
+                    int(inp.get("fn", 0)), int(inp.get("tn", 0)),
+                )
         elif run.task == TaskType.meta_analysis:
             opts = {k: inp[k] for k in (
                 "measure", "model", "tau2_method", "hksj", "subgroups",
@@ -192,6 +197,15 @@ def compute_tool(run: Run) -> Run:
                 Artifact(kind="figure", path=str(fn), caption="Funnel plot"),
             ]
         except Exception:  # noqa: BLE001 - a plotting failure must not fail the report
+            artifacts = []
+    elif run.task == TaskType.diagnostic and isinstance(result, dict) and result.get("roc_points"):
+        try:
+            art_dir = out_dir / "artifacts" / run.id
+            art_dir.mkdir(parents=True, exist_ok=True)
+            rp = art_dir / "roc.png"
+            diagnostic.roc_plot(result, str(rp))
+            artifacts = [Artifact(kind="figure", path=str(rp), caption="ROC curve")]
+        except Exception:  # noqa: BLE001
             artifacts = []
 
     report_writer.markdown_to_docx(markdown, artifacts, docx_path, fmt=fmt)

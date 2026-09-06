@@ -118,6 +118,22 @@ def test_meta_fisher_z():
     assert "transformed" in r["random"]  # back to r
 
 
+def test_diagnostic_roc(tmp_path):
+    pairs = [[0.9, 1], [0.8, 1], [0.7, 0], [0.6, 1], [0.55, 0],
+             [0.5, 1], [0.4, 0], [0.3, 0], [0.2, 1], [0.1, 0]]
+    r = diagnostic.roc_auc(pairs)
+    assert 0 <= r["auc"] <= 1
+    assert r["auc_ci_low"] <= r["auc"] <= r["auc_ci_high"]
+    assert r["youden_cutoff"] is not None
+    assert len(r["roc_points"]) >= 3
+    assert "sensitivity" in r["at_optimal_cutoff"]
+    fp = tmp_path / "roc.png"
+    diagnostic.roc_plot(r, str(fp))
+    assert fp.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+    with pytest.raises(diagnostic.DiagnosticError):
+        diagnostic.roc_auc([[0.5, 1], [0.6, 1]])  # no negatives
+
+
 def test_meta_plots(tmp_path):
     r = meta_analysis.analyze(_generic(), model="random")
     fp = tmp_path / "forest.png"
