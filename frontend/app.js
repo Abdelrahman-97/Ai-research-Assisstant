@@ -385,6 +385,10 @@ function viewEstimate() {
       <div class="k">Columns</div><div>${s ? s.n_cols : "?"}</div>
     </div>
     <div>${cols}</div>
+    <div class="btn-row" style="margin-top:14px;">
+      <button id="previewBtn" class="btn btn-ghost">Preview data &amp; descriptives</button>
+    </div>
+    <div id="previewBox"></div>
     <label style="margin-top:18px;">Target word count for the Results section</label>
     <input id="wordCount" type="number" min="100" max="20000" step="50" value="800" />
     <label style="margin-top:18px;">Interaction with your analyst</label>
@@ -596,6 +600,12 @@ function bindRunHandlers() {
     render();
   });
 
+  const previewBtn = document.getElementById("previewBtn");
+  if (previewBtn) previewBtn.onclick = () => step("previewBtn", async () => {
+    const data = await api(`/runs/${r.id}/preview`);
+    document.getElementById("previewBox").innerHTML = renderPreview(data);
+  });
+
   const estimateBtn = document.getElementById("estimateBtn");
   if (estimateBtn) estimateBtn.onclick = () => step("estimateBtn", async () => {
     const wc = parseInt(document.getElementById("wordCount").value, 10);
@@ -787,6 +797,47 @@ async function pollForPaid(id, reference) {
     }
     if (tries > 20) clearInterval(iv);
   }, 2500);
+}
+
+function renderPreview(data) {
+  const cols = data.preview_columns || [];
+  const th = cols.map(c => `<th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface);">${esc(c)}</th>`).join("");
+  const trs = (data.rows || []).map(row =>
+    `<tr>${cols.map(c => `<td style="padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap;">${esc(row[c])}</td>`).join("")}</tr>`
+  ).join("");
+
+  const dhead = ["Column", "Type", "Count", "Missing", "Mean", "SD", "Min", "Median", "Max", "Unique / top"];
+  const drows = (data.columns || []).map(c => {
+    const stats = c.kind === "numeric"
+      ? [c.mean, c.sd, c.min, c.median, c.max].map(v => v == null ? "—" : v)
+      : ["—", "—", "—", "—", "—"];
+    const last = c.kind === "numeric"
+      ? ""
+      : `${c.n_unique} unique · ${(c.top || []).map(t => `${esc(t.value)} (${t.count})`).join(", ")}`;
+    return `<tr>
+      <td style="padding:6px 10px;border-bottom:1px solid var(--line);"><strong>${esc(c.name)}</strong></td>
+      <td style="padding:6px 10px;border-bottom:1px solid var(--line);">${esc(c.kind)}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid var(--line);">${c.count}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid var(--line);">${c.missing}</td>
+      ${stats.map(v => `<td style="padding:6px 10px;border-bottom:1px solid var(--line);">${esc(v)}</td>`).join("")}
+      <td style="padding:6px 10px;border-bottom:1px solid var(--line);">${last}</td>
+    </tr>`;
+  }).join("");
+
+  const dth = dhead.map(h => `<th style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);">${esc(h)}</th>`).join("");
+
+  return `
+    <div style="margin-top:16px;">
+      <h3>Data preview <span class="sub" style="font-weight:400;">(${data.n_rows} rows × ${data.n_cols} columns)</span></h3>
+      <div style="overflow:auto;max-height:280px;border:1px solid var(--line);border-radius:var(--radius-sm);margin:8px 0 18px;">
+        <table style="border-collapse:collapse;font-size:13px;min-width:100%;"><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table>
+      </div>
+      <h3>Descriptive statistics</h3>
+      <div style="overflow:auto;max-height:320px;border:1px solid var(--line);border-radius:var(--radius-sm);margin:8px 0;">
+        <table style="border-collapse:collapse;font-size:13px;min-width:100%;"><thead><tr>${dth}</tr></thead><tbody>${drows}</tbody></table>
+      </div>
+      <p class="muted-note">A quick read of your data. The full analysis (with significance tests per your protocol) runs after you approve the plan.</p>
+    </div>`;
 }
 
 function buildFormatForm() {

@@ -78,6 +78,9 @@ def test_every_endpoint(tmp_path):
                          files={"data_file": ("d.csv", f, "text/csv")})
     assert up.status_code == 200; hit.add("/runs/{run_id}/upload")
 
+    prev = client.get(f"/runs/{run_id}/preview", headers=auth)
+    assert prev.status_code == 200 and prev.json()["n_rows"] == 4; hit.add("/runs/{run_id}/preview")
+
     est = client.post(f"/runs/{run_id}/estimate", headers=auth, json={"word_count": 800})
     assert est.status_code == 200; hit.add("/runs/{run_id}/estimate")
 

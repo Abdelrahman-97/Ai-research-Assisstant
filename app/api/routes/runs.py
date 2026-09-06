@@ -32,7 +32,7 @@ from app.models.schemas import (
     User,
 )
 from app.services import (
-    assistant, cleanup, formatting, orchestrator, payments, report_writer,
+    assistant, cleanup, formatting, orchestrator, payments, preview, report_writer,
 )
 from app.services.llm_client import LLMError
 from app.services.orchestrator import PipelineError
@@ -401,6 +401,25 @@ def accept(run_id: str, user: User = Depends(get_current_user)) -> Run:
     """User accepts the finished results — starts the 30-day retention window."""
     run = _get_owned_run(run_id, user)
     return _guard(lambda: orchestrator.accept(run))
+
+
+@router.get("/{run_id}/preview")
+def preview_data(run_id: str, user: User = Depends(get_current_user)):
+    """Preview the uploaded data + per-column descriptives (read-only)."""
+    run = _get_owned_run(run_id, user)
+    try:
+        path = orchestrator._ensure_local_data(run)
+    except PipelineError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No data uploaded yet."
+        )
+    try:
+        return preview.preview_file(path)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Could not preview the data: {exc}",
+        ) from exc
 
 
 @router.get("/{run_id}", response_model=Run)
