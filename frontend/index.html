@@ -13,11 +13,14 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Neura" />
   <script>
-    /* Apply saved light/dark choice before paint to avoid a flash. */
+    /* Apply saved light/dark + language choices before paint to avoid a flash. */
     (function () {
       try {
         var t = localStorage.getItem("neura_theme");
         if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+        var l = localStorage.getItem("neura_lang") || "en";
+        document.documentElement.setAttribute("lang", l);
+        document.documentElement.setAttribute("dir", l === "ar" ? "rtl" : "ltr");
       } catch (e) {}
     })();
   </script>
@@ -26,6 +29,7 @@
   <header class="topbar">
     <div class="brand"><svg width="20" height="20" viewBox="0 0 64 64" style="vertical-align:-3px" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"><line x1="20" y1="18" x2="20" y2="46"/><line x1="44" y1="18" x2="44" y2="46"/><line x1="20" y1="18" x2="44" y2="46"/><circle cx="44" cy="18" r="7" fill="currentColor" stroke="none"/></svg><span class="brand-word">Neura<span class="brand-sub">RESEARCH</span></span></div>
     <div class="topbar-right">
+      <button id="langToggle" class="theme-toggle" title="Language / اللغة">🌐 EN</button>
       <button id="themeToggle" class="theme-toggle" title="Appearance">◐ Auto</button>
       <span id="userEmail" class="user-email"></span>
       <button id="logoutBtn" class="btn btn-ghost hidden">Log out</button>
@@ -48,6 +52,7 @@
 
   <!-- API base URL lives in config.js (edit that for production). -->
   <script src="config.js"></script>
+  <script src="i18n.js"></script>
   <script src="app.js"></script>
   <script src="contact.js"></script>
 </body>

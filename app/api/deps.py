@@ -10,6 +10,7 @@ from __future__ import annotations
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.config import settings
 from app.models.schemas import User
 from app.services.security import decode_access_token
 from app.store import repository
@@ -36,5 +37,18 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Session expired, please log in again.",
+        )
+    return user
+
+
+def get_verified_user(user: User = Depends(get_current_user)) -> User:
+    """Like get_current_user, but also requires a verified email when the gate is
+    enabled (settings.require_email_verification). Used to protect starting a job.
+    """
+    if settings.require_email_verification and not user.email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email address before starting a job. "
+                   "Check your inbox for the verification link.",
         )
     return user

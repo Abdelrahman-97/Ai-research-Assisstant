@@ -15,7 +15,7 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse, Response
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_verified_user
 from app.config import settings
 from app.ratelimit import limiter
 from app.models.schemas import (
@@ -69,7 +69,7 @@ def _guard(fn):
 def create_run(
     request: Request,
     body: CreateRunRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_verified_user),
 ) -> Run:
     return orchestrator.create_run(user.id, body.task, body.scope)
 
@@ -86,7 +86,7 @@ async def upload(
     run_id: str,
     protocol: str = Form(..., description="Protocol / methods text"),
     data_file: UploadFile = File(...),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_verified_user),
 ) -> Run:
     run = _get_owned_run(run_id, user)
 
@@ -121,6 +121,14 @@ async def upload(
                     detail=f"File too large (max {settings.max_upload_mb} MB).",
                 )
             f.write(chunk)
+
+    # Normalize CSV/TSV to clean UTF-8 so Arabic (and other non-ASCII) column
+    # names/values read correctly downstream and in the generated script.
+    try:
+        from app.services import integrity_checker as _ic
+        _ic.normalize_csv_utf8(dest)
+    except Exception:  # noqa: BLE001 - keep the original file if normalization fails
+        pass
 
     # Persist the dataset to the shared blob store so the background worker (a
     # separate service, no shared disk) can run the analysis against it, and so

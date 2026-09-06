@@ -39,7 +39,10 @@ Rules:
 - Print all numeric results (test statistic, p-value, effect size, CIs, group
   descriptives) clearly to standard output.
 - Save any tables as CSV and any figures as PNG into an "artifacts/" directory
-  (create it if needed).
+  (create it if needed). Save CSVs with UTF-8 encoding (encoding="utf-8").
+- The data may contain non-ASCII (e.g. Arabic) column names and values. Handle
+  them normally — reference columns by their exact names, keep everything UTF-8,
+  and do not transliterate or drop non-ASCII text.
 - Do NOT access the network. Do NOT install packages. Use only the standard
   scientific stack (for Python: pandas, numpy, scipy, statsmodels, matplotlib;
   for R: base + stats).

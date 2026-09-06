@@ -75,6 +75,21 @@ document.getElementById("logoutBtn").onclick = () => {
   btn.onclick = () => { cur = order[(order.indexOf(cur) + 1) % order.length]; apply(cur); };
 })();
 
+/* Language toggle: English ⇄ العربية, remembered per browser. Flips the whole
+   layout to RTL and translates the UI (see i18n.js). */
+(function setupLangToggle() {
+  const btn = document.getElementById("langToggle");
+  if (!btn || !window.NEURA_I18N) return;
+  const label = () => { btn.textContent = NEURA_I18N.getLang() === "ar" ? "🌐 ع" : "🌐 EN"; };
+  label();
+  btn.onclick = () => {
+    NEURA_I18N.setLang(NEURA_I18N.getLang() === "ar" ? "en" : "ar");
+    label();
+    if (NEURA_I18N.getLang() === "en") { location.reload(); return; } // restore source strings cleanly
+    render();
+  };
+})();
+
 /* ------------------------------- Screens ------------------------------- */
 const STEPS = [
   ["upload", "Upload"], ["estimate", "Price"], ["pay", "Pay"],
@@ -232,6 +247,7 @@ async function renderDashboard() {
   };
   document.querySelectorAll(".run-item").forEach(el =>
     el.onclick = () => openRun(el.dataset.id));
+  if (window.NEURA_I18N) NEURA_I18N.apply();
 }
 
 /* --- New task (task + scope) --- */
@@ -831,6 +847,7 @@ function render() {
     case "run": state.run ? renderRun() : renderDashboard(); break;
     default: renderAuth();
   }
+  if (window.NEURA_I18N) NEURA_I18N.apply();
 }
 
 /* --------------------------- Bootstrap --------------------------------- */

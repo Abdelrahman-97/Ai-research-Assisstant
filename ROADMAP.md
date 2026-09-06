@@ -22,9 +22,11 @@ We build these **one at a time, together**. Captured so nothing is lost.
   in Modern Standard Arabic; Word is fully right-to-left; PDF uses an Arabic font
   (Amiri) with proper shaping. Language picker at the results step. Numbers/stats
   stay in standard form to match the analysis.
-- ⏳ **Run Arabic data** — Arabic column names / values / encoding end-to-end
-  (next Arabic sub-step).
-- ⏳ **Arabic UI translation** (full i18n) with **RTL** layout (next Arabic sub-step).
+- ✅ **Run Arabic data** — DONE. Uploaded CSV/TSV is auto-normalised to UTF-8;
+  reads handle UTF-8 (incl. BOM) and Windows-Arabic (cp1256); the generated
+  script is told to keep Arabic column names/values intact.
+- ✅ **Arabic UI + RTL** — DONE. Language toggle (🌐 EN ⇄ ع) in the top bar flips
+  the whole layout right-to-left and translates the interface (i18n.js).
   *(See "Languages" note below for how many we can offer.)*
 
 ### 2. Meta-analysis
@@ -52,9 +54,11 @@ A parallel analysis type with its own configuration:
   **likelihood ratios**, diagnostic odds ratio, and **ROC curve + AUC**.
 - Agreement stats (Cohen's/Fleiss' kappa, Bland–Altman) as a natural extension.
 
-### 7. Require email verification before access
-- Gate the app so a new account must **verify its email** before running jobs
-  (verification flow already exists; this makes it mandatory). Small change.
+### 7. Require email verification before access — ✅ BUILT (off by default)
+- A new account must **verify its email** before starting a job. Controlled by
+  `REQUIRE_EMAIL_VERIFICATION` (default off). **To turn it on in production:** add
+  `REQUIRE_EMAIL_VERIFICATION=true` to `/opt/neura/deploy/.env`, then
+  `docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d`.
 
 ---
 

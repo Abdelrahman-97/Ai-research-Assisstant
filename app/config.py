@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 60 * 24  # 24h
     verify_token_minutes: int = 60 * 24        # email verification link: 24h
     reset_token_minutes: int = 30              # password reset link: 30 min
+    # When True, a user must verify their email before starting a job. Off by
+    # default (dev/tests); set REQUIRE_EMAIL_VERIFICATION=true in production.
+    require_email_verification: bool = False
 
     # Email (SMTP). If smtp_host is empty, emails are logged instead of sent (dev).
     smtp_host: str = ""

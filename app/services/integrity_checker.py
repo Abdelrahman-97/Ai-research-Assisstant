@@ -20,17 +20,43 @@ from app.models.schemas import ColumnSummary, DataSummary, IntegrityReport
 _SAMPLE_VALUES = 5
 
 
+# Encodings tried in order for CSV/TSV — covers UTF-8 (incl. BOM), Windows Arabic
+# (cp1256), and a last-resort latin-1 that never raises. This lets Arabic (and
+# other non-ASCII) column names and values load reliably.
+_CSV_ENCODINGS = ("utf-8-sig", "utf-8", "cp1256", "latin-1")
+
+
 def read_dataframe(path: str | Path) -> pd.DataFrame:
-    """Load a .xlsx/.xls/.csv/.tsv file into a DataFrame."""
+    """Load a .xlsx/.xls/.csv/.tsv file into a DataFrame (encoding-robust)."""
     p = Path(path)
     suffix = p.suffix.lower()
     if suffix in {".xlsx", ".xls"}:
         return pd.read_excel(p)
-    if suffix == ".csv":
-        return pd.read_csv(p)
-    if suffix == ".tsv":
-        return pd.read_csv(p, sep="\t")
+    if suffix in {".csv", ".tsv"}:
+        sep = "\t" if suffix == ".tsv" else ","
+        last_exc: Exception | None = None
+        for enc in _CSV_ENCODINGS:
+            try:
+                return pd.read_csv(p, sep=sep, encoding=enc)
+            except (UnicodeDecodeError, UnicodeError) as exc:
+                last_exc = exc
+                continue
+        # latin-1 above never raises on decode, so we only get here on a real
+        # parse error — re-raise the most useful one.
+        raise last_exc or ValueError("Could not parse the file.")
     raise ValueError(f"Unsupported data file type: {suffix or '(none)'}")
+
+
+def normalize_csv_utf8(path: str | Path) -> None:
+    """Rewrite a CSV/TSV in place as clean UTF-8 so downstream reads (and the
+    generated analysis script) never hit an encoding surprise. No-op for Excel."""
+    p = Path(path)
+    suffix = p.suffix.lower()
+    if suffix not in {".csv", ".tsv"}:
+        return
+    df = read_dataframe(p)
+    sep = "\t" if suffix == ".tsv" else ","
+    df.to_csv(p, index=False, sep=sep, encoding="utf-8")
 
 
 def summarize(df: pd.DataFrame) -> DataSummary:

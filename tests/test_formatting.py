@@ -129,6 +129,18 @@ def test_results_writer_arabic_prompt():
     assert out == "## النتائج\n\nتم."
 
 
+def test_arabic_data_encodings(tmp_path):
+    from app.services import integrity_checker as ic
+    for enc in ("cp1256", "utf-8-sig", "utf-8"):
+        p = tmp_path / f"{enc}.csv"
+        p.write_text("المجموعة,العمر\nتجريبية,45\nضابطة,50\n", encoding=enc)
+        ic.normalize_csv_utf8(p)
+        rep = ic.check_data_file(p)
+        assert rep.ok
+        assert [c.name for c in rep.summary.columns] == ["المجموعة", "العمر"]
+        p.read_text(encoding="utf-8")   # normalized file is valid UTF-8
+
+
 def test_consultation_pricing():
     none = pricing.quote(scope=Scope.thesis, data_summary=_summary(), n_tests=3, word_count=800)
     review = pricing.quote(scope=Scope.thesis, data_summary=_summary(), n_tests=3,
