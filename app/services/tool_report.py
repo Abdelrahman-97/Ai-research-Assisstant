@@ -15,6 +15,13 @@ def _p(p):
     return "< .001" if p < 0.001 else f"{p:.3f}"
 
 
+def _pstr(p):
+    """A full 'p ...' phrase that reads naturally (no 'p = < .001')."""
+    if p is None:
+        return "p = —"
+    return "p < .001" if p < 0.001 else f"p = {p:.3f}"
+
+
 def _refs_block(refs: list[str]) -> str:
     if not refs:
         return ""
@@ -107,6 +114,7 @@ def _diagnostic(inp: dict, r: dict) -> str:
 def _meta(inp: dict, r: dict) -> str:
     label = r.get("scale_label", "effect")
     log = r.get("log_scale")
+    het = r["heterogeneity"]
 
     def show(e):
         if "transformed" in e:
@@ -114,12 +122,33 @@ def _meta(inp: dict, r: dict) -> str:
             return f"{t['estimate']} (95% CI {t['ci_low']} to {t['ci_high']})"
         return f"{e['estimate']} (95% CI {e['ci_low']} to {e['ci_high']})"
 
-    het = r["heterogeneity"]
+    # Plain-language interpretation for the summary.
+    primary = r["random"] if r["model"] == "random" else r["fixed"]
+    pval = primary.get("p_value")
+    sig = (pval is not None and pval < 0.05)
+    null = 1.0 if log else 0.0
+    est_disp = primary["transformed"]["estimate"] if "transformed" in primary else primary["estimate"]
+    if not sig:
+        direction = "no statistically significant overall effect"
+    elif (est_disp > null):
+        direction = "a statistically significant effect above the null value"
+    else:
+        direction = "a statistically significant effect below the null value"
+    i2 = het["I2_percent"]
+    het_word = "low" if i2 < 25 else "moderate" if i2 < 75 else "considerable"
+
     md = [
         "# Meta-analysis\n",
-        f"Pooled **{r['k']} studies** on the **{label}** scale using a "
+        "## Summary\n",
+        f"We pooled **{r['k']} studies** on the **{label}** scale using a "
         f"**{r['model']}-effects model**"
-        + (f" (τ² by {het['tau2_method']})." if r['model'] == 'random' else ".") + "\n",
+        + (f" (between-study variance τ² estimated by {het['tau2_method']}"
+           + (", with the Hartung-Knapp adjustment)" if primary.get('method') == 'Hartung-Knapp' else ")")
+           if r['model'] == 'random' else "") + ". "
+        f"The pooled estimate was **{show(primary)}**, {_pstr(pval)} — indicating {direction}. "
+        f"Between-study heterogeneity was **{het_word}** (I² = {i2}%). "
+        "See the forest plot for the per-study effects and the pooled result, and the funnel plot for "
+        "a visual check of small-study effects.\n",
         "## Pooled effect\n",
         f"- **Random-effects estimate:** {show(r['random'])}, p = {_p(r['random'].get('p_value'))}"
         + (f" [{r['random'].get('method')} interval]" if r['random'].get('method') else ""),
