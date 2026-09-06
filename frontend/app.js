@@ -406,8 +406,10 @@ function viewUpload() {
     <p class="sub">We validate the data and use it to price the job — this step is free.</p>
     <label>Protocol / methods</label>
     <textarea id="protocol" placeholder="Paste the methods / analysis plan of your study..."></textarea>
+    <p class="muted-note">💡 Describe your design, groups, and the outcomes you want compared. The clearer this is, the better the AI's proposed analysis. Arabic is supported.</p>
     <label>Data file (Excel or CSV)</label>
     <input id="dataFile" type="file" accept=".xlsx,.xls,.csv,.tsv" />
+    <p class="muted-note">💡 One row per participant, one column per variable, with a header row. Arabic column names are fine. Nothing is charged until you see and approve the price.</p>
     <div class="btn-row"><button id="uploadBtn" class="btn btn-primary">Upload & validate</button></div>`;
 }
 function viewEstimate() {
@@ -497,6 +499,7 @@ function viewPlan() {
   return `
     <h2>Proposed plan — your approval needed</h2>
     <p class="sub">Review the AI's proposal. Approve it, or edit before continuing. Nothing runs until you approve.</p>
+    <p class="muted-note">💡 This is the key checkpoint: the AI suggests the statistical test, but <strong>you</strong> decide. Not sure? Use "Your analyst" chat below to ask why this test was chosen or request a different one.</p>
     <label>Test</label>
     <input id="pName" value="${esc(t.name || "")}" />
     <label>Reasoning</label>
@@ -526,6 +529,7 @@ function viewScriptPreview() {
   return `
     <h2>Script preview</h2>
     <p class="sub">This runs in an isolated sandbox (no network). Review it, then run.</p>
+    <p class="muted-note">💡 This is the exact code that will analyse your data — shown for full transparency. You don't need to understand it; just click "Run analysis" to execute it safely.</p>
     <pre class="code">${esc(state.run.script || "")}</pre>
     <div class="btn-row"><button id="executeBtn" class="btn btn-primary">Run analysis</button></div>`;
 }
@@ -600,7 +604,8 @@ function viewResults() {
     <h2>Your Results section ${accepted ? '<span class="pill ok">accepted</span>' : '<span class="pill ok">ready</span>'}</h2>
     <div class="md">${esc(r.results_markdown || "")}</div>
     ${accepted ? `<p class="muted-note">Files available until ${expiry}.</p>`
-      : `<p class="sub" style="margin-top:16px;">Happy with it? Accept to finalise (starts the 30-day storage window).</p>`}
+      : `<p class="sub" style="margin-top:16px;">Happy with it? Accept to finalise (starts the 30-day storage window).</p>
+         <p class="muted-note">💡 Want changes first? Use "Your analyst" chat below to refine wording, re-run, or add analyses before you accept. Download the Word file to edit it yourself.</p>`}
     <div class="btn-row">
       ${accepted ? "" : `<button id="acceptBtn" class="btn btn-primary">Accept results</button>`}
       <button id="dlWord" class="btn btn-ghost">⬇ Word</button>
