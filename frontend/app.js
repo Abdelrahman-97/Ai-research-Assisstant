@@ -703,20 +703,25 @@ function viewToolInput(task) {
         <select id="mTau"><option value="DL">DerSimonian-Laird</option><option value="PM">Paule-Mandel</option><option value="REML">REML</option></select></div>
     </div>
     <label class="agree"><input type="checkbox" id="mHksj" /> <span>Use Hartung-Knapp adjustment (more conservative CIs; good for few studies)</span></label>
+    <label class="agree"><input type="checkbox" id="mSub" checked /> <span>Subgroup analysis (needs a <strong>group</strong> column) + test for differences</span></label>
+    <label class="agree"><input type="checkbox" id="mReg" /> <span>Meta-regression (needs a numeric <strong>moderator</strong> column)</span></label>
+    <label class="agree"><input type="checkbox" id="mCum" /> <span>Cumulative analysis (needs a <strong>year</strong> column)</span></label>
+    <p class="muted-note">Optional trailing columns, in this order: <strong>group, moderator, year</strong>. Add only the ones you need — e.g. for subgroups add a group column; for meta-regression add group (or leave blank) then a moderator number.</p>
     <div class="btn-row"><button id="toolEstimateBtn" class="btn btn-primary">Continue to price</button></div>`;
 }
 
+const _OPT = " [, group, moderator, year]";
 const META_HELP = {
-  generic: "Columns: name, effect, standard_error, group(optional). Example: Smith 2019, 0.20, 0.10, adults",
-  or: "Columns: name, events1, n1, events2, n2, group(optional). Example: Smith 2019, 20, 100, 30, 100, adults",
-  rr: "Columns: name, events1, n1, events2, n2, group(optional).",
-  rd: "Columns: name, events1, n1, events2, n2, group(optional).",
-  peto: "Columns: name, events1, n1, events2, n2, group(optional).",
-  md: "Columns: name, n1, mean1, sd1, n2, mean2, sd2, group(optional).",
-  smd: "Columns: name, n1, mean1, sd1, n2, mean2, sd2, group(optional).",
-  fisher_z: "Columns: name, r, n, group(optional). Example: Smith 2019, 0.3, 50, adults",
-  proportion: "Columns: name, events, total, group(optional). Example: Smith 2019, 25, 100",
-  hr: "Columns: name, logHR, standard_error, group(optional). Enter the natural log of the HR.",
+  generic: "Columns: name, effect, standard_error" + _OPT + ". Example: Smith 2019, 0.20, 0.10, adults, 55, 2019",
+  or: "Columns: name, events1, n1, events2, n2" + _OPT + ". Example: Smith 2019, 20, 100, 30, 100, adults",
+  rr: "Columns: name, events1, n1, events2, n2" + _OPT + ".",
+  rd: "Columns: name, events1, n1, events2, n2" + _OPT + ".",
+  peto: "Columns: name, events1, n1, events2, n2" + _OPT + ".",
+  md: "Columns: name, n1, mean1, sd1, n2, mean2, sd2" + _OPT + ".",
+  smd: "Columns: name, n1, mean1, sd1, n2, mean2, sd2" + _OPT + ".",
+  fisher_z: "Columns: name, r, n" + _OPT + ". Example: Smith 2019, 0.3, 50, adults",
+  proportion: "Columns: name, events, total" + _OPT + ". Example: Smith 2019, 25, 100",
+  hr: "Columns: name, logHR, standard_error" + _OPT + ". Enter the natural log of the HR.",
 };
 
 function _num(x) { const v = parseFloat(x); return isNaN(v) ? null : v; }
@@ -741,22 +746,31 @@ function gatherToolInputs(task) {
   }
   // meta
   const measure = document.getElementById("mMeasure").value;
+  const CORE = { generic: 3, hr: 3, or: 5, rr: 5, rd: 5, peto: 5, md: 7, smd: 7, fisher_z: 3, proportion: 3 };
+  const core = CORE[measure] || 3;
   const lines = document.getElementById("mData").value.split("\n").map(l => l.trim()).filter(Boolean);
   const studies = lines.map(line => {
     const p = line.split(",").map(s => s.trim());
     const o = { name: p[0] };
-    if (measure === "generic") { o.effect = _num(p[1]); o.se = _num(p[2]); o.group = p[3] || null; }
-    else if (measure === "hr") { o.effect = _num(p[1]); o.se = _num(p[2]); o.group = p[3] || null; }
-    else if (["or", "rr", "rd", "peto"].includes(measure)) { o.e1 = _num(p[1]); o.n1 = _num(p[2]); o.e2 = _num(p[3]); o.n2 = _num(p[4]); o.group = p[5] || null; }
-    else if (["md", "smd"].includes(measure)) { o.n1 = _num(p[1]); o.m1 = _num(p[2]); o.sd1 = _num(p[3]); o.n2 = _num(p[4]); o.m2 = _num(p[5]); o.sd2 = _num(p[6]); o.group = p[7] || null; }
-    else if (measure === "fisher_z") { o.r = _num(p[1]); o.n = _num(p[2]); o.group = p[3] || null; }
-    else if (measure === "proportion") { o.events = _num(p[1]); o.total = _num(p[2]); o.group = p[3] || null; }
+    if (measure === "generic" || measure === "hr") { o.effect = _num(p[1]); o.se = _num(p[2]); }
+    else if (["or", "rr", "rd", "peto"].includes(measure)) { o.e1 = _num(p[1]); o.n1 = _num(p[2]); o.e2 = _num(p[3]); o.n2 = _num(p[4]); }
+    else if (["md", "smd"].includes(measure)) { o.n1 = _num(p[1]); o.m1 = _num(p[2]); o.sd1 = _num(p[3]); o.n2 = _num(p[4]); o.m2 = _num(p[5]); o.sd2 = _num(p[6]); }
+    else if (measure === "fisher_z") { o.r = _num(p[1]); o.n = _num(p[2]); }
+    else if (measure === "proportion") { o.events = _num(p[1]); o.total = _num(p[2]); }
+    // optional trailing columns, in order: group, moderator, year
+    const extra = p.slice(core);
+    if (extra[0]) o.group = extra[0];
+    if (extra[1] !== undefined && extra[1] !== "") o.moderator = _num(extra[1]);
+    if (extra[2] !== undefined && extra[2] !== "") o.year = _num(extra[2]);
     return o;
   });
   return { studies, measure, model: document.getElementById("mModel").value,
            tau2_method: document.getElementById("mTau").value,
            hksj: document.getElementById("mHksj").checked,
-           subgroups: true, meta_regression: false, cumulative: false, bias_tests: true };
+           subgroups: document.getElementById("mSub").checked,
+           meta_regression: document.getElementById("mReg").checked,
+           cumulative: document.getElementById("mCum").checked,
+           bias_tests: true };
 }
 
 function renderToolRun() {

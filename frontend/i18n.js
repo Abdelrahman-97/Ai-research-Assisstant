@@ -132,6 +132,41 @@ window.NEURA_I18N = (function () {
     "Support:": "الدعم:",
     "email": "البريد",
     "WhatsApp": "واتساب",
+    // Workspace / dashboard
+    "Research workspace": "مساحة العمل البحثية",
+    "Choose an analysis to begin.": "اختر تحليلًا للبدء.",
+    "About Neura": "عن Neura",
+    "Delete account": "حذف الحساب",
+    "Upload data → AI plan → full write-up (Word/PDF)": "ارفع البيانات ← خطة بالذكاء الاصطناعي ← تقرير كامل (Word/PDF)",
+    "Pool studies · heterogeneity · bias · subgroups": "تجميع الدراسات · التباين · التحيّز · المجموعات الفرعية",
+    "Power & sample-size for every common design": "القوة وحجم العينة لكل التصاميم الشائعة",
+    "Sensitivity · specificity · PPV/NPV · LRs": "الحساسية · النوعية · القيم التنبؤية · نِسب الأرجحية",
+    // Tool inputs — shared
+    "Continue to price": "المتابعة إلى السعر",
+    "Model": "النموذج",
+    "Random effects": "التأثيرات العشوائية",
+    "Fixed effect": "التأثير الثابت",
+    "Effect measure": "مقياس الأثر",
+    "Studies — one per line": "الدراسات — سطر لكل دراسة",
+    "What are you comparing?": "ما الذي تقارنه؟",
+    "Significance (alpha)": "مستوى الدلالة (ألفا)",
+    "Power": "القوة الإحصائية",
+    "Expected drop-out (optional)": "نسبة التسرّب المتوقعة (اختياري)",
+    "True positives (TP)": "الإيجابيات الصحيحة (TP)",
+    "False positives (FP)": "الإيجابيات الكاذبة (FP)",
+    "False negatives (FN)": "السلبيات الكاذبة (FN)",
+    "True negatives (TN)": "السلبيات الصحيحة (TN)",
+    "A complete, cited report you can download as Word and PDF.": "تقرير كامل وموثّق يمكنك تنزيله بصيغتي Word وPDF.",
+    "Edit inputs": "تعديل المدخلات",
+    // Help tips (plain text)
+    "💡 Describe your design, groups, and the outcomes you want compared. The clearer this is, the better the AI's proposed analysis. Arabic is supported.":
+      "💡 صف تصميم دراستك ومجموعاتك والنتائج التي تريد مقارنتها. كلما كان الوصف أوضح، كانت خطة التحليل المقترحة أفضل. اللغة العربية مدعومة.",
+    "💡 One row per participant, one column per variable, with a header row. Arabic column names are fine. Nothing is charged until you see and approve the price.":
+      "💡 صف واحد لكل مشارك، وعمود لكل متغير، مع صف عناوين. أسماء الأعمدة بالعربية مقبولة. لا يُخصم أي مبلغ حتى ترى السعر وتوافق عليه.",
+    "💡 This is the exact code that will analyse your data — shown for full transparency. You don't need to understand it; just click \"Run analysis\" to execute it safely.":
+      "💡 هذا هو الكود الفعلي الذي سيحلّل بياناتك — معروض لأقصى درجات الشفافية. لست بحاجة لفهمه؛ فقط اضغط «تشغيل التحليل» لتنفيذه بأمان.",
+    "💡 Want changes first? Use \"Your analyst\" chat below to refine wording, re-run, or add analyses before you accept. Download the Word file to edit it yourself.":
+      "💡 تريد تعديلات أولًا؟ استخدم محادثة «محللك» بالأسفل لتحسين الصياغة أو إعادة التشغيل أو إضافة تحاليل قبل القبول. ونزّل ملف Word لتعدّله بنفسك.",
   };
 
   // Placeholders (translated as attributes, not text nodes).
