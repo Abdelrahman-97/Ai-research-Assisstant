@@ -33,6 +33,8 @@ def _sample_size(inp: dict, r: dict) -> str:
         "anova": "more than two groups (one-way ANOVA)",
         "correlation": "a correlation",
         "chi_square": "a chi-square test",
+        "survival": "a time-to-event (survival) outcome, log-rank test",
+        "regression": "multiple linear regression",
     }
     name = design_names.get(r.get("design"), r.get("design"))
     md = ["# Sample-size calculation\n",
@@ -46,7 +48,14 @@ def _sample_size(inp: dict, r: dict) -> str:
                   f"({r['power'] * 100:.0f}%). Power is the chance of detecting a real effect of the size you "
                   f"assumed; 0.80 (80%) is the common minimum.")
     else:
-        if "n_group1" in r:
+        if "events_required" in r:
+            md.append(f"You need at least **{r['events_required']} events** (e.g. deaths/relapses) "
+                      "to detect the specified hazard ratio — this is the primary driver of power in "
+                      "survival studies.")
+            if "total" in r:
+                md.append(f"\nGiven your expected overall event probability, that implies enrolling about "
+                          f"**{r['total']} participants** in total.")
+        elif "n_group1" in r:
             md.append(f"You need **{r['n_group1']} in group 1** and **{r['n_group2']} in group 2** "
                       f"(**{r['total']} in total**).")
         elif "n_per_group" in r:

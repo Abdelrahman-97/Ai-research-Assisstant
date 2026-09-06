@@ -29,6 +29,16 @@ def test_sample_size_more_designs():
     assert sample_size.chi_square(effect_size=0.3, df=2)["total"] > 0
 
 
+def test_sample_size_survival_and_regression():
+    s = sample_size.survival(hazard_ratio=0.7, event_probability=0.6)
+    assert s["events_required"] > 0 and s["total"] > s["events_required"]
+    assert s["references"]
+    r = sample_size.regression(effect_size=0.15, n_predictors=3)
+    assert r["total"] > 3
+    with pytest.raises(sample_size.SampleSizeError):
+        sample_size.survival(hazard_ratio=1.0)
+
+
 def test_sample_size_dropout_inflates():
     base = sample_size.two_means(effect_size=0.5)["total"]
     infl = sample_size.two_means(effect_size=0.5, dropout=0.2)["total"]

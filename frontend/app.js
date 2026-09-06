@@ -631,6 +631,8 @@ const SS_FIELDS = {
   one_mean: [["effect_size", "Effect size (Cohen's d)", "0.5", ""]],
   one_proportion: [["p1", "Expected proportion", "0.6", ""], ["p0", "Reference proportion", "0.5", ""]],
   chi_square: [["effect_size", "Effect size (Cohen's w)", "0.3", "Small 0.1 · medium 0.3 · large 0.5"], ["df", "Degrees of freedom", "2", ""]],
+  survival: [["hazard_ratio", "Hazard ratio (HR)", "0.7", "< 1 = protective; e.g. 0.7"], ["allocation", "Allocation to group 1 (0–1)", "0.5", "0.5 = equal groups"], ["event_probability", "Overall event probability (optional)", "0", "Leave 0 if unknown; e.g. 0.6 → gives total N"]],
+  regression: [["effect_size", "Effect size (Cohen's f²)", "0.15", "Small .02 · medium .15 · large .35"], ["n_predictors", "Number of predictors", "3", "Total predictors in the model"]],
 };
 
 async function startTool(task) {
@@ -654,6 +656,8 @@ function viewToolInput(task) {
         <option value="anova">More than two groups (ANOVA)</option>
         <option value="correlation">A correlation</option>
         <option value="chi_square">A chi-square test</option>
+        <option value="survival">Survival / time-to-event (log-rank)</option>
+        <option value="regression">Multiple linear regression</option>
       </select>
       <div id="ssFields"></div>
       <div style="display:flex;gap:12px;">
@@ -751,7 +755,7 @@ function gatherToolInputs(task) {
     const drop = _num(document.getElementById("ssDrop").value); if (drop) params.dropout = drop;
     SS_FIELDS[design].forEach(([id]) => {
       const v = _num(document.getElementById("ss_" + id).value);
-      params[id] = id === "k_groups" || id === "df" ? Math.round(v) : v;
+      params[id] = ["k_groups", "df", "n_predictors"].includes(id) ? Math.round(v) : v;
     });
     return { design, params };
   }

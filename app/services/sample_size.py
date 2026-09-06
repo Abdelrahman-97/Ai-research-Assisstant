@@ -231,10 +231,59 @@ def chi_square(effect_size=None, df=None, alpha=0.05, power=0.80, solve="n",
             "references": citations.refs(["cohen1988"])}
 
 
+def survival(hazard_ratio=None, alpha=0.05, power=0.80, allocation=0.5,
+             event_probability=None, dropout=0.0) -> dict:
+    """Survival / log-rank: required number of events (Schoenfeld), and total N
+    if an overall event probability is given."""
+    if not hazard_ratio or hazard_ratio <= 0 or hazard_ratio == 1:
+        raise SampleSizeError("Hazard ratio must be > 0 and not equal to 1.")
+    if not (0 < allocation < 1):
+        raise SampleSizeError("Allocation proportion must be between 0 and 1.")
+    _check(alpha, power)
+    za = stats.norm.ppf(1 - alpha / 2)
+    zb = stats.norm.ppf(power)
+    lnhr = math.log(hazard_ratio)
+    events = _ceil(((za + zb) ** 2) / (allocation * (1 - allocation) * lnhr ** 2))
+    out = {"design": "survival", "solve": "n", "events_required": events,
+           "inputs": {"hazard_ratio": hazard_ratio, "alpha": alpha, "power": power,
+                      "allocation": allocation, "event_probability": event_probability,
+                      "dropout": dropout},
+           "references": citations.refs(["schoenfeld1983"])}
+    if event_probability and 0 < event_probability <= 1:
+        total = _ceil(events / event_probability)
+        out["total"] = _dropout(total, dropout)
+    return out
+
+
+def regression(effect_size=None, n_predictors=None, alpha=0.05, power=0.80, dropout=0.0) -> dict:
+    """Multiple linear regression: total N for a given Cohen's f² and #predictors."""
+    if not effect_size or effect_size <= 0:
+        raise SampleSizeError("Effect size (Cohen's f²) must be > 0.")
+    if not n_predictors or n_predictors < 1:
+        raise SampleSizeError("Number of predictors must be >= 1.")
+    _check(alpha, power)
+    k = int(n_predictors)
+    n = k + 2
+    while n < 1_000_000:
+        df2 = n - k - 1
+        if df2 > 0:
+            fcrit = stats.f.ppf(1 - alpha, k, df2)
+            pw = 1 - stats.ncf.cdf(fcrit, k, df2, effect_size * n)
+            if pw >= power:
+                break
+        n += 1
+    return {"design": "regression", "solve": "n", "n_predictors": k,
+            "total": _dropout(n, dropout),
+            "inputs": {"effect_size": effect_size, "alpha": alpha, "power": power,
+                       "dropout": dropout},
+            "references": citations.refs(["cohen1988"])}
+
+
 _DISPATCH = {
     "two_means": two_means, "paired_means": paired_means, "one_mean": one_mean,
     "two_proportions": two_proportions, "one_proportion": one_proportion,
     "anova": anova, "correlation": correlation, "chi_square": chi_square,
+    "survival": survival, "regression": regression,
 }
 
 
