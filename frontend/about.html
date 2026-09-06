@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>About — Neura</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="favicon.svg" />
+  <meta name="theme-color" content="#0a6b63" />
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("neura_theme");
+        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+  <style>
+    .founder { display:flex; gap:22px; align-items:center; flex-wrap:wrap; }
+    .founder img, .founder .avatar {
+      width:120px; height:120px; border-radius:50%; object-fit:cover;
+      border:1px solid var(--line); background:var(--accent-soft);
+      display:flex; align-items:center; justify-content:center;
+      color:var(--accent-ink); font-family:var(--serif); font-size:40px; font-weight:600;
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><svg width="20" height="20" viewBox="0 0 64 64" style="vertical-align:-3px" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"><line x1="20" y1="18" x2="20" y2="46"/><line x1="44" y1="18" x2="44" y2="46"/><line x1="20" y1="18" x2="44" y2="46"/><circle cx="44" cy="18" r="7" fill="currentColor" stroke="none"/></svg><span class="brand-word">Neura<span class="brand-sub">RESEARCH</span></span></div>
+    <a class="btn btn-ghost" href="index.html" style="padding:8px 18px;font-size:14px;">Open the app →</a>
+  </header>
+
+  <main class="app">
+    <div class="card">
+      <h1>About Neura</h1>
+      <p class="sub">Neura helps researchers and postgraduate students turn their data into a rigorous, publication-ready Results section — AI proposes, a human approves every judgment call, and nothing is treated as fact until it has been verified.</p>
+    </div>
+
+    <div class="card">
+      <h2>Founder</h2>
+      <div class="founder">
+        <!-- Replace the avatar div below with: <img src="founder.jpg" alt="Abdelrahman" /> -->
+        <div class="avatar">A</div>
+        <div>
+          <h3 style="margin:0;">Abdelrahman</h3>
+          <p class="sub" style="margin:4px 0 0;">Founder — Neura</p>
+          <p style="margin:12px 0 0;max-width:46ch;">
+            [Add your short bio here — your background, your research field, and why
+            you built Neura. Two or three sentences work best.]
+          </p>
+          <p class="muted-note" style="margin-top:10px;">
+            Contact: <a class="js-support-email link" href="#">email</a>
+          </p>
+        </div>
+      </div>
+      <p class="muted-note" style="margin-top:18px;">
+        To personalise this page: drop a square photo named <code>founder.jpg</code> into the
+        <code>frontend/</code> folder and swap the placeholder circle for the image tag noted in the HTML,
+        then replace the bracketed bio text with your own.
+      </p>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <a href="index.html">Home</a>·<a href="calculators.html">Free tools</a>·
+    <a href="terms.html">Terms</a>·<a href="privacy.html">Privacy</a>
+  </footer>
+
+  <script src="config.js"></script>
+  <script src="contact.js"></script>
+</body>
+</html>

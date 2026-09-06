@@ -29,30 +29,40 @@ We build these **one at a time, together**. Captured so nothing is lost.
   the whole layout right-to-left and translates the interface (i18n.js).
   *(See "Languages" note below for how many we can offer.)*
 
-### 2. Meta-analysis
-A parallel analysis type with its own configuration:
+### 2. Meta-analysis — ✅ engine + free tool built
+Engine (`app/services/meta_analysis.py`) + public tool on `calculators.html`:
+fixed/random effects, heterogeneity (Q, df, p, I², τ²), leave-one-out, subgroups,
+per-study weights. **Still to do (v1 polish):** forest/funnel plot images and
+optional integration into the paid pipeline + Word/PDF write-up.
+
+Original scope for reference — a parallel analysis type with its own configuration:
 - Pooled effect (fixed / random effects).
 - **Heterogeneity** test (I², Q, τ²).
 - **Sensitivity analysis** (leave-one-out).
 - **Subgroup analysis**.
 - Forest plot + funnel plot outputs.
 
-### 3. Sample-size calculation — fully built out
-- Power / sample-size for the common designs (t-tests, ANOVA, proportions,
-  correlation, survival, etc.), with inputs for effect size, power, alpha.
+### 3. Sample-size calculation — ✅ built (free tool)
+- Power / sample-size for two-means (t-test), two-proportions, one-way ANOVA, and
+  correlation, with inputs for effect size, power, alpha. Live on `calculators.html`.
+  **Later:** survival / repeated-measures designs if demand appears.
 
-### 4. Data preview on upload
-- When data is uploaded, open an **Excel-style preview** of all the data, plus an
-  automatic **descriptive summary**: means, SDs, and preliminary significance,
-  organised **according to the study protocol**.
+### 4. Data preview on upload — ✅ built
+- On upload, a **"Preview data & descriptives"** button shows the rows in a table
+  plus a per-column summary (mean, SD, min/median/max, missing, unique/top). Live
+  at the estimate step. **Later:** preliminary significance hints tied to the
+  study protocol (that's really the paid analysis).
 
-### 5. Founder / about
-- Founder section with **your photo + your info** (About/Founder page).
+### 5. Founder / about — ✅ page scaffolded (needs your photo + bio)
+- `about.html` is live with a founder section. **To personalise:** drop a square
+  `founder.jpg` into `frontend/` and replace the placeholder circle + the bracketed
+  bio text with your own (instructions are in the page).
 
-### 6. Diagnostic / biomedical statistics
-- Diagnostic-test metrics: **sensitivity, specificity, PPV, NPV**, accuracy,
-  **likelihood ratios**, diagnostic odds ratio, and **ROC curve + AUC**.
-- Agreement stats (Cohen's/Fleiss' kappa, Bland–Altman) as a natural extension.
+### 6. Diagnostic / biomedical statistics — ✅ core built (free tool)
+- Diagnostic-test metrics from a 2×2 with 95% CIs: **sensitivity, specificity,
+  PPV, NPV, accuracy, prevalence, likelihood ratios, diagnostic OR**. Live on
+  `calculators.html`. **Later:** ROC curve + AUC from raw data; agreement stats
+  (Cohen's/Fleiss' kappa, Bland–Altman).
 
 ### 7. Require email verification before access — ✅ BUILT (off by default)
 - A new account must **verify its email** before starting a job. Controlled by
