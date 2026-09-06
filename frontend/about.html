@@ -40,12 +40,14 @@
     <div class="card">
       <h2>Founder</h2>
       <div class="founder">
-        <!-- Replace the avatar div below with: <img src="founder.jpg" alt="Abdelrahman" /> -->
-        <div class="avatar">A</div>
+        <!-- Your photo appears automatically once frontend/founder.jpg exists;
+             until then it falls back to the initial circle. -->
+        <img src="founder.jpg" alt="Founder" onerror="this.style.display='none';document.getElementById('founderInitial').style.display='flex';" />
+        <div class="avatar" id="founderInitial" style="display:none;">A</div>
         <div>
-          <h3 style="margin:0;">Abdelrahman</h3>
+          <h3 style="margin:0;" id="founderName">Abdelrahman</h3>
           <p class="sub" style="margin:4px 0 0;">Founder — Neura</p>
-          <p style="margin:12px 0 0;max-width:46ch;">
+          <p style="margin:12px 0 0;max-width:52ch;" id="founderBio">
             [Add your short bio here — your background, your research field, and why
             you built Neura. Two or three sentences work best.]
           </p>
@@ -55,9 +57,9 @@
         </div>
       </div>
       <p class="muted-note" style="margin-top:18px;">
-        To personalise this page: drop a square photo named <code>founder.jpg</code> into the
-        <code>frontend/</code> folder and swap the placeholder circle for the image tag noted in the HTML,
-        then replace the bracketed bio text with your own.
+        To finish this page: drop a square photo named <code>founder.jpg</code> into
+        <code>frontend/</code> (it appears here automatically), and replace the bracketed
+        bio text and the name above with your own.
       </p>
     </div>
   </main>
