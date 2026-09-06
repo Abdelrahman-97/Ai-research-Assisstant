@@ -384,6 +384,67 @@ def _model_refs(tau2_method, hksj):
     return keys
 
 
+_TEAL = "#0a6b63"
+_INK = "#1a2b32"
+
+
+def forest_plot(result: dict, path: str) -> str:
+    """Draw a forest plot (per-study effects + CIs and the pooled diamond)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    studies = result["studies"]
+    n = len(studies)
+    fig, ax = plt.subplots(figsize=(7.2, 0.5 * n + 2.2))
+    ys = list(range(n, 0, -1))
+    for y, s in zip(ys, studies):
+        ax.plot([s["ci_low"], s["ci_high"]], [y, y], color=_TEAL, lw=1.5, zorder=2)
+        size = 4 + (s.get("weight_pct", 5) or 5) * 0.25
+        ax.plot(s["effect"], y, "s", color=_TEAL, ms=size, zorder=3)
+    r = result["random"]
+    ax.plot([r["ci_low"], r["ci_high"]], [0, 0], color=_INK, lw=2.2, zorder=3)
+    ax.plot(r["estimate"], 0, "D", color=_INK, ms=11, zorder=4)
+    ax.axvline(0, color="#9aa7a9", ls="--", lw=1, zorder=1)
+    ax.set_yticks(ys + [0])
+    ax.set_yticklabels([s["name"] for s in studies] + ["Pooled (random)"])
+    ax.set_ylim(-1, n + 1)
+    label = result.get("scale_label", "effect")
+    ax.set_xlabel(label + (" — log scale" if result.get("log_scale") else ""))
+    ax.set_title("Forest plot")
+    for spine in ("top", "right"):
+        ax.spines[spine].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(path, dpi=130)
+    plt.close()
+    return path
+
+
+def funnel_plot(result: dict, path: str) -> str:
+    """Draw a funnel plot (effect vs standard error) to eyeball small-study bias."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    studies = result["studies"]
+    xs = [s["effect"] for s in studies]
+    ses = [max((s["ci_high"] - s["ci_low"]) / (2 * Z), 1e-6) for s in studies]
+    fig, ax = plt.subplots(figsize=(6.4, 5))
+    ax.scatter(xs, ses, color=_TEAL, zorder=3)
+    ax.axvline(result["random"]["estimate"], color=_INK, ls="--", lw=1.2, zorder=2)
+    ax.invert_yaxis()
+    label = result.get("scale_label", "effect")
+    ax.set_xlabel(label + (" — log scale" if result.get("log_scale") else ""))
+    ax.set_ylabel("Standard error")
+    ax.set_title("Funnel plot")
+    for spine in ("top", "right"):
+        ax.spines[spine].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(path, dpi=130)
+    plt.close()
+    return path
+
+
 def analyze(studies, *, measure="generic", model="random", tau2_method="DL",
             hksj=False, subgroups=True, meta_regression=True, cumulative=True,
             bias_tests=True) -> dict:

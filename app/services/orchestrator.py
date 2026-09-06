@@ -27,6 +27,7 @@ from pathlib import Path
 from app.config import settings
 from app.models.schemas import (
     TOOL_TASKS,
+    Artifact,
     Language,
     PriceQuote,
     Run,
@@ -175,8 +176,26 @@ def compute_tool(run: Run) -> Run:
     out_dir = Path(settings.data_dir) / "outputs"
     docx_path = out_dir / f"results_{run.id}.docx"
     pdf_path = out_dir / f"results_{run.id}.pdf"
-    report_writer.markdown_to_docx(markdown, [], docx_path, fmt=fmt)
-    report_writer.markdown_to_pdf(markdown, [], pdf_path, fmt=fmt)
+
+    # Meta-analysis: add forest + funnel plots as figures in the report.
+    artifacts: list[Artifact] = []
+    if run.task == TaskType.meta_analysis:
+        try:
+            art_dir = out_dir / "artifacts" / run.id
+            art_dir.mkdir(parents=True, exist_ok=True)
+            fp = art_dir / "forest.png"
+            fn = art_dir / "funnel.png"
+            meta_analysis.forest_plot(result, str(fp))
+            meta_analysis.funnel_plot(result, str(fn))
+            artifacts = [
+                Artifact(kind="figure", path=str(fp), caption="Forest plot"),
+                Artifact(kind="figure", path=str(fn), caption="Funnel plot"),
+            ]
+        except Exception:  # noqa: BLE001 - a plotting failure must not fail the report
+            artifacts = []
+
+    report_writer.markdown_to_docx(markdown, artifacts, docx_path, fmt=fmt)
+    report_writer.markdown_to_pdf(markdown, artifacts, pdf_path, fmt=fmt)
     run.docx_blob_id = blobs.put(run.id, kind="docx", filename=docx_path.name, content=docx_path.read_bytes())
     run.pdf_blob_id = blobs.put(run.id, kind="pdf", filename=pdf_path.name, content=pdf_path.read_bytes())
     run.results_markdown = markdown

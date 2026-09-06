@@ -118,6 +118,16 @@ def test_meta_fisher_z():
     assert "transformed" in r["random"]  # back to r
 
 
+def test_meta_plots(tmp_path):
+    r = meta_analysis.analyze(_generic(), model="random")
+    fp = tmp_path / "forest.png"
+    fn = tmp_path / "funnel.png"
+    meta_analysis.forest_plot(r, str(fp))
+    meta_analysis.funnel_plot(r, str(fn))
+    assert fp.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+    assert fn.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+
+
 def test_meta_requires_two():
     with pytest.raises(meta_analysis.MetaAnalysisError):
         meta_analysis.analyze([{"effect": 0.2, "se": 0.1}])
