@@ -29,11 +29,16 @@ We build these **one at a time, together**. Captured so nothing is lost.
   the whole layout right-to-left and translates the interface (i18n.js).
   *(See "Languages" note below for how many we can offer.)*
 
-### 2. Meta-analysis — ✅ engine + free tool built
-Engine (`app/services/meta_analysis.py`) + public tool on `calculators.html`:
-fixed/random effects, heterogeneity (Q, df, p, I², τ²), leave-one-out, subgroups,
-per-study weights. **Still to do (v1 polish):** forest/funnel plot images and
-optional integration into the paid pipeline + Word/PDF write-up.
+### 2. Meta-analysis — ✅ comprehensive engine built (+ citations)
+Engine (`app/services/meta_analysis.py`) + public API. Now covers **all effect
+measures** (generic, MD, SMD/Hedges g, OR, RR, RD, Peto, Fisher-z, proportion,
+HR), **τ² estimators** (DL, Paule-Mandel, REML), **Hartung-Knapp** CIs,
+**prediction intervals**, heterogeneity (Q, df, p, I², H², τ²), **subgroups +
+test for differences**, **meta-regression**, **cumulative**, leave-one-out, and
+**publication bias** (Egger, Begg, trim-and-fill). Every method cites a real
+reference. **Still to do:** expose all these options in the calculators UI (the
+page currently uses the basic form), forest/funnel plot images, and paid-pipeline
+integration with a Word/PDF write-up.
 
 Original scope for reference — a parallel analysis type with its own configuration:
 - Pooled effect (fixed / random effects).
