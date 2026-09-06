@@ -27,18 +27,19 @@ class DiagnosticRequest(BaseModel):
     tn: int
 
 
-class MetaStudy(BaseModel):
-    name: str | None = None
-    effect: float
-    se: float | None = None
-    variance: float | None = None
-    group: str | None = None
-
-
 class MetaRequest(BaseModel):
-    studies: list[MetaStudy]
-    model: str = "random"
+    # Studies are free-form dicts so each effect measure can carry its own fields
+    # (effect/se, or n1/m1/sd1/..., or e1/n1/e2/n2, or r/n, or events/total),
+    # plus optional group, moderator, and year.
+    studies: list[dict]
+    measure: str = "generic"       # generic|md|smd|or|rr|rd|peto|fisher_z|proportion|hr
+    model: str = "random"          # random|fixed
+    tau2_method: str = "DL"        # DL|PM|REML
+    hksj: bool = False             # Hartung-Knapp CI
     subgroups: bool = True
+    meta_regression: bool = True
+    cumulative: bool = True
+    bias_tests: bool = True
 
 
 @router.post("/sample-size")
@@ -63,7 +64,11 @@ def diagnostic_tool(request: Request, body: DiagnosticRequest) -> dict:
 @limiter.limit("30/minute")
 def meta_analysis_tool(request: Request, body: MetaRequest) -> dict:
     try:
-        studies = [s.model_dump() for s in body.studies]
-        return meta_analysis.analyze(studies, model=body.model, subgroups=body.subgroups)
+        return meta_analysis.analyze(
+            body.studies, measure=body.measure, model=body.model,
+            tau2_method=body.tau2_method, hksj=body.hksj, subgroups=body.subgroups,
+            meta_regression=body.meta_regression, cumulative=body.cumulative,
+            bias_tests=body.bias_tests,
+        )
     except meta_analysis.MetaAnalysisError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
