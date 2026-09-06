@@ -39,13 +39,11 @@ Requirements:
 - Round to journal convention: statistics and descriptives to 2 decimal places;
   report p-values in APA style (e.g. "p < .001", otherwise 3 decimals like
   "p = .032"). Round only for presentation — never change or invent a value.
-- Write in formal, past-tense academic English as PLAIN TEXT. Do NOT use LaTeX or
-  math notation: no "$", no "\\text{{}}", no "\\times". Write "mmHg", "×", "95% CI"
-  as plain characters.
+- {language_rule}
 - Reference tables/figures by their file names in backticks, e.g.
   `descriptive_statistics.csv`, so underscores are preserved: {artifact_names}.
 - If a standard value the reader would expect is absent from the output, add a
-  short "[missing: ...]" note rather than fabricating it.
+  short "{missing_label}" note rather than fabricating it.
 - Output Markdown using only headings, paragraphs, and **bold**/*italic*. Do not
   include anything except the Results section itself.
 
@@ -63,6 +61,29 @@ Table contents (CSV artifacts):
 {tables}
 ---
 """
+
+# Per-language writing rules. Statistics/numbers stay in standard Latin digits and
+# APA style in every language so they match the analysis output exactly.
+_LANG_RULES = {
+    "en": (
+        "Write in formal, past-tense academic English as PLAIN TEXT. Do NOT use "
+        "LaTeX or math notation: no \"$\", no \"\\text{}\", no \"\\times\". Write "
+        "\"mmHg\", \"×\", \"95% CI\" as plain characters."
+    ),
+    "ar": (
+        "اكتب باللغة العربية الفصحى بأسلوب أكاديمي رسمي كنص عادي (بدون LaTeX أو رموز "
+        "رياضية). أبقِ كل الأرقام والقيم الإحصائية وقيم p بالأرقام اللاتينية "
+        "القياسية وبنمط APA تمامًا كما وردت في المخرجات (مثل \"p < .001\"، "
+        "\"t(58) = 4.91\"). اكتب العناوين والفقرات بالعربية، مع الإبقاء على أسماء "
+        "الملفات ومصطلحات مثل \"95% CI\" و\"p\" كما هي."
+    ),
+}
+
+_SYSTEM_AR = (
+    "أنت مساعد كتابة أكاديمي تكتب قسم النتائج لبحث علمي باللغة العربية الفصحى. "
+    "تكتب فقط ما تدعمه مخرجات التحليل ولا تختلق أي أرقام. إذا كانت قيمة غير موجودة "
+    "في المخرجات، تذكر صراحةً أنها مفقودة بدلًا من تخمينها."
+)
 
 
 def _read_tables(artifacts: list[Artifact], max_chars: int = 4000) -> str:
@@ -85,11 +106,18 @@ def write_results(
     test: ProposedTest,
     execution: ExecutionResult,
     scope: Scope,
+    language: str = "en",
     client: LLMClient | None = None,
 ) -> str:
-    """Verify the output and return the Results section as Markdown."""
+    """Verify the output and return the Results section as Markdown.
+
+    `language` controls the language of the written prose ("en" or "ar"); numbers
+    and statistics stay in standard form regardless, to match the analysis output.
+    """
     client = client or LLMClient()
+    lang = language if language in _LANG_RULES else "en"
     artifact_names = ", ".join(a.caption or Path(a.path).name for a in execution.artifacts) or "(none)"
+    missing_label = "[missing: ...]" if lang == "en" else "[مفقود: ...]"
     prompt = _INSTRUCTIONS.format(
         scope=scope.value,
         test_name=test.name,
@@ -97,10 +125,13 @@ def write_results(
         artifact_names=artifact_names,
         stdout=execution.stdout.strip() or "(no stdout captured)",
         tables=_read_tables(execution.artifacts),
+        language_rule=_LANG_RULES[lang],
+        missing_label=missing_label,
     )
+    system = _SYSTEM_AR if lang == "ar" else _SYSTEM
     return client.chat(
         [
-            {"role": "system", "content": _SYSTEM},
+            {"role": "system", "content": system},
             {"role": "user", "content": prompt},
         ]
     )

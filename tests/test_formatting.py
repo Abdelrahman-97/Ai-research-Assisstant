@@ -90,6 +90,45 @@ def _summary():
     return DataSummary(n_rows=100, n_cols=5, columns=[])
 
 
+def test_docx_rtl_marks_paragraphs(tmp_path):
+    from docx.oxml.ns import qn
+    fmt = formatting.resolve(FormatSpec(preset="standard"))
+    out = tmp_path / "ar.docx"
+    report_writer.markdown_to_docx("# النتائج\n\nفقرة عربية.\n", [], out, fmt=fmt, rtl=True)
+    d = Document(str(out))
+    marked = 0
+    for p in d.paragraphs:
+        pPr = p._p.find(qn("w:pPr"))
+        if pPr is not None and pPr.find(qn("w:bidi")) is not None:
+            marked += 1
+    assert marked >= 1   # at least the heading + paragraph carry RTL
+
+
+class _FakeClient:
+    def __init__(self):
+        self.messages = None
+    def chat(self, messages):
+        self.messages = messages
+        return "## النتائج\n\nتم."
+
+
+def test_results_writer_arabic_prompt():
+    from app.services import results_writer
+    from app.models.schemas import ProposedTest, ExecutionResult, RunStatus
+    fake = _FakeClient()
+    test = ProposedTest(name="t-test", reasoning="two groups", variables=["g", "y"])
+    ex = ExecutionResult(status=RunStatus.executed, stdout="t=4.9 p=0.001")
+    out = results_writer.write_results(
+        test=test, execution=ex, scope=Scope.studies, language="ar", client=fake
+    )
+    # Arabic system prompt + Arabic writing rule were used.
+    system = fake.messages[0]["content"]
+    user = fake.messages[1]["content"]
+    assert "العربية" in system
+    assert "العربية" in user
+    assert out == "## النتائج\n\nتم."
+
+
 def test_consultation_pricing():
     none = pricing.quote(scope=Scope.thesis, data_summary=_summary(), n_tests=3, word_count=800)
     review = pricing.quote(scope=Scope.thesis, data_summary=_summary(), n_tests=3,

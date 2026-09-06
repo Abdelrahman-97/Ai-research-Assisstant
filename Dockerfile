@@ -5,9 +5,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System deps: gcc for any source builds, libgomp1 for scipy/statsmodels (OpenMP).
+# System deps: gcc for any source builds, libgomp1 for scipy/statsmodels (OpenMP),
+# and an Arabic-capable font (Amiri) so Arabic Results render correctly in PDFs.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends gcc libgomp1 \
+    && apt-get install -y --no-install-recommends gcc libgomp1 fonts-hosny-amiri \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

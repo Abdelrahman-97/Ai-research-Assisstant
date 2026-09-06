@@ -475,6 +475,11 @@ function formatPicker() {
     <div class="card" style="margin-top:16px;background:#fbfaf7;">
       <strong>Output format</strong>
       <p class="sub" style="margin-top:2px;">How your Word &amp; PDF will look. Preview a sample before writing.</p>
+      <label>Language of the write-up</label>
+      <select id="fmtLang">
+        <option value="en" selected>English</option>
+        <option value="ar">العربية (Arabic)</option>
+      </select>
       <label>Style</label>
       <select id="fmtPreset">
         <option value="standard">Standard academic (Times New Roman 12)</option>
@@ -774,6 +779,8 @@ function buildFormatForm() {
   const fd = new FormData();
   const preset = presetEl.value;
   fd.append("preset", preset);
+  const langEl = document.getElementById("fmtLang");
+  if (langEl) fd.append("output_language", langEl.value);
   fd.append("figure_start_number", document.getElementById("fmtFigStart").value || "1");
   fd.append("table_start_number", document.getElementById("fmtTblStart").value || "1");
   if (preset === "custom") {

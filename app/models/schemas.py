@@ -366,6 +366,8 @@ class Run(BaseModel):
 
     # output formatting (how the .docx/.pdf are styled)
     format_spec: FormatSpec | None = None
+    # language of the generated Results prose: "en" | "ar"
+    output_language: str = "en"
 
     # outputs
     results_markdown: str | None = None

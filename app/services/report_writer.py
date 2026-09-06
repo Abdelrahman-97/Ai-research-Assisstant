@@ -18,10 +18,11 @@ import re
 from pathlib import Path
 
 from docx import Document
-from docx.enum.text import WD_LINE_SPACING
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt
 from reportlab.lib import colors
+from reportlab.lib.enums import TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
@@ -32,6 +33,64 @@ from reportlab.platypus import (
 
 from app.models.schemas import Artifact
 from app.services.formatting import ResolvedFormat, resolve
+
+# --- Arabic / RTL support (graceful: degrades if libs or fonts are absent) ---
+try:
+    import arabic_reshaper
+    from bidi.algorithm import get_display
+    _AR_LIBS = True
+except Exception:  # noqa: BLE001
+    _AR_LIBS = False
+
+_AR_FONT_CANDIDATES = [
+    "/usr/share/fonts/truetype/hosny-amiri/Amiri-Regular.ttf",
+    "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf",
+    "/usr/share/fonts/opentype/noto/NotoNaskhArabic-Regular.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+]
+_AR_FONT_NAME: str | None = None
+
+
+def _arabic_font() -> str:
+    """Register and return an Arabic-capable font name for reportlab, or ''."""
+    global _AR_FONT_NAME
+    if _AR_FONT_NAME is not None:
+        return _AR_FONT_NAME
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    for path in _AR_FONT_CANDIDATES:
+        if Path(path).exists():
+            try:
+                pdfmetrics.registerFont(TTFont("ArabicFont", path))
+                _AR_FONT_NAME = "ArabicFont"
+                return _AR_FONT_NAME
+            except Exception:  # noqa: BLE001
+                continue
+    _AR_FONT_NAME = ""
+    return _AR_FONT_NAME
+
+
+def _shape_ar(text: str) -> str:
+    """Reshape + bidi Arabic text for correct PDF rendering; no-op if unavailable."""
+    if not _AR_LIBS or not text:
+        return text
+    try:
+        return get_display(arabic_reshaper.reshape(text))
+    except Exception:  # noqa: BLE001
+        return text
+
+
+def _mark_paragraph_rtl(paragraph) -> None:
+    """Set a docx paragraph to right-to-left with right alignment."""
+    try:
+        pPr = paragraph._p.get_or_add_pPr()
+        pPr.append(pPr.makeelement(qn("w:bidi"), {}))
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        for run in paragraph.runs:
+            rPr = run._r.get_or_add_rPr()
+            rPr.append(rPr.makeelement(qn("w:rtl"), {}))
+    except Exception:  # noqa: BLE001
+        pass
 
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 _BULLET_RE = re.compile(r"^[-*]\s+(.*)$")
@@ -183,6 +242,7 @@ def markdown_to_docx(
     *,
     fmt: ResolvedFormat | None = None,
     template_path: str | Path | None = None,
+    rtl: bool = False,
 ) -> Path:
     """Convert a Markdown Results section + artifacts into a styled .docx."""
     fmt = fmt or resolve(None)
@@ -252,6 +312,10 @@ def markdown_to_docx(
         _caption(doc, label)
         fnum += 1
 
+    if rtl:
+        for p in doc.paragraphs:
+            _mark_paragraph_rtl(p)
+
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(out))
@@ -285,6 +349,7 @@ def markdown_to_pdf(
     out_path: str | Path,
     *,
     fmt: ResolvedFormat | None = None,
+    rtl: bool = False,
 ) -> Path:
     """Convert a Markdown Results section + artifacts into a styled .pdf."""
     fmt = fmt or resolve(None)
@@ -294,20 +359,37 @@ def markdown_to_pdf(
     base_font, bold_font, italic_font = _FONT_MAP.get(
         fmt.font_name.lower(), ("Helvetica", "Helvetica-Bold", "Helvetica-Oblique")
     )
+    # For Arabic, use a single Unicode font for all weights and lay out right-to-left.
+    afont = _arabic_font() if rtl else ""
+    use_ar = bool(rtl and afont)
+    if use_ar:
+        base_font = bold_font = italic_font = afont
+    align = TA_RIGHT if rtl else None
+
+    def render(s: str) -> str:
+        """Inline formatting for LTR; reshaped plain text for Arabic."""
+        if use_ar:
+            plain = _clean_latex(s)
+            plain = re.sub(r"\*\*(.+?)\*\*", r"\1", plain)
+            plain = re.sub(r"(?<!\*)\*(?!\*)(.+?)\*(?!\*)", r"\1", plain)
+            plain = plain.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            return _shape_ar(plain)
+        return _md_inline_to_html(s)
+
+    _al = {"alignment": align} if align is not None else {}
     size = fmt.font_size_pt
     leading = size * fmt.line_spacing
-
     body = ParagraphStyle(
-        "Body", fontName=base_font, fontSize=size, leading=leading, spaceAfter=6,
+        "Body", fontName=base_font, fontSize=size, leading=leading, spaceAfter=6, **_al,
     )
     cap = ParagraphStyle(
         "Cap", fontName=italic_font, fontSize=max(size - 1, 8),
-        leading=(size) * 1.1, spaceAfter=8,
+        leading=(size) * 1.1, spaceAfter=8, **_al,
     )
     heads = {
         i: ParagraphStyle(
             f"H{i}", fontName=bold_font, fontSize=size + max(5 - i, 0),
-            leading=(size + max(5 - i, 0)) * 1.2, spaceBefore=10, spaceAfter=6,
+            leading=(size + max(5 - i, 0)) * 1.2, spaceBefore=10, spaceAfter=6, **_al,
         )
         for i in range(1, 5)
     }
@@ -335,22 +417,22 @@ def markdown_to_pdf(
             text = heading.group(2).strip()
             if fmt.heading_numbering:
                 text = _heading_prefix(counters, level) + text
-            story.append(Paragraph(_md_inline_to_html(text), heads[level]))
+            story.append(Paragraph(render(text), heads[level]))
             continue
 
         bullet = _BULLET_RE.match(line)
         if bullet:
-            bullets.append(ListItem(Paragraph(_md_inline_to_html(bullet.group(1)), body)))
+            bullets.append(ListItem(Paragraph(render(bullet.group(1)), body)))
             continue
 
         numbered = _NUMBERED_RE.match(line)
         if numbered:
             flush_bullets()
-            story.append(Paragraph(_md_inline_to_html(numbered.group(1)), body))
+            story.append(Paragraph(render(numbered.group(1)), body))
             continue
 
         flush_bullets()
-        story.append(Paragraph(_md_inline_to_html(line), body))
+        story.append(Paragraph(render(line), body))
 
     flush_bullets()
 
@@ -360,7 +442,7 @@ def markdown_to_pdf(
     for headers, rows, caption in tables:
         label = f"Table {tnum}." + (f" {caption}" if caption else "")
         if fmt.caption_above_table:
-            story.append(Paragraph(_md_inline_to_html(label), cap))
+            story.append(Paragraph(render(label), cap))
         data = [headers] + rows
         t = Table(data, repeatRows=1)
         t.setStyle(TableStyle([
@@ -373,7 +455,7 @@ def markdown_to_pdf(
         ]))
         story.append(t)
         if not fmt.caption_above_table:
-            story.append(Paragraph(_md_inline_to_html(label), cap))
+            story.append(Paragraph(render(label), cap))
         story.append(Spacer(1, 10))
         tnum += 1
 
@@ -385,7 +467,7 @@ def markdown_to_pdf(
         except Exception:  # noqa: BLE001
             continue
         label = f"Figure {fnum}." + (f" {caption}" if caption else "")
-        story.append(Paragraph(_md_inline_to_html(label), cap))
+        story.append(Paragraph(render(label), cap))
         fnum += 1
 
     # One or two columns.

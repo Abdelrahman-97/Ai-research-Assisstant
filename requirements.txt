@@ -33,6 +33,8 @@ matplotlib          # figures (headless 'Agg' backend at runtime)
 # --- Document export (Markdown -> .docx / .pdf) ---
 python-docx
 reportlab           # PDF generation
+arabic-reshaper     # correct Arabic glyph shaping in PDFs
+python-bidi         # right-to-left ordering for Arabic PDFs
 
 # --- AI / LLM ---
 openai              # Kimi is OpenAI-compatible; used via base_url override

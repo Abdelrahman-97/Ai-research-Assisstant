@@ -288,6 +288,7 @@ async def set_format(
     figure_start_number: int = Form(1),
     table_start_number: int = Form(1),
     caption_above_table: bool = Form(True),
+    output_language: str = Form("en"),
     template: UploadFile | None = File(None),
     user: User = Depends(get_current_user),
 ) -> Run:
@@ -305,6 +306,7 @@ async def set_format(
         figure_start_number=figure_start_number, table_start_number=table_start_number,
         caption_above_table=caption_above_table, template_blob_id=template_blob_id,
     )
+    run.output_language = output_language if output_language in ("en", "ar") else "en"
     return repository.runs.save(run)
 
 

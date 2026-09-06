@@ -1,21 +1,88 @@
-# Neura — Roadmap / Ideas
+# Neura — Roadmap
 
-Captured so nothing is lost. Not built yet — for future sessions.
+We build these **one at a time, together**. Captured so nothing is lost.
 
-## Next up
-- **Blog / articles section** (requested). A simple content area on the site for
-  articles (SEO + credibility). Likely: a `posts/` set of markdown files rendered
-  to pages, or a small posts table + admin. To design next session.
+## ✅ Live now (v1 shipped)
+- Full pipeline: upload → price → pay → AI plan (human-approved) → script preview
+  → sandboxed run → Results section (Word + PDF).
+- Analyst chat layer; interaction tiers (Basic/Standard/Pro).
+- Output formatting: presets (Standard, APA, Vancouver, two-column), **match my
+  document** (template upload), custom font/size/spacing, numbered figure/table
+  captions with configurable start numbers, real tables, style-sample preview.
+- Expert consultation add-ons: review (+500), full analysis (+3000).
+- Custom domain + HTTPS, Zoho email, Budget pricing, Apple-academic redesign with
+  light/dark toggle, keyless SSH + push-to-deploy.
 
-## Bigger ideas (v2+)
-- **Consultant marketplace.** A directory of vetted statistical consultants with
-  profiles and **ratings/reviews**. If a customer chooses a consultant, the job is
-  routed to that human instead of the AI pipeline. Needs: consultant accounts,
-  availability, job hand-off, messaging, payouts, and a review system. The current
-  "full expert analysis (+3000)" add-on is the first step toward this.
+---
 
-## Smaller improvements to consider
+## v1 — next, in order (agreed step-by-step)
+
+### 1. Arabic support (first priority)
+- ✅ **Generate results in Arabic** — DONE. Results write-up + headings + captions
+  in Modern Standard Arabic; Word is fully right-to-left; PDF uses an Arabic font
+  (Amiri) with proper shaping. Language picker at the results step. Numbers/stats
+  stay in standard form to match the analysis.
+- ⏳ **Run Arabic data** — Arabic column names / values / encoding end-to-end
+  (next Arabic sub-step).
+- ⏳ **Arabic UI translation** (full i18n) with **RTL** layout (next Arabic sub-step).
+  *(See "Languages" note below for how many we can offer.)*
+
+### 2. Meta-analysis
+A parallel analysis type with its own configuration:
+- Pooled effect (fixed / random effects).
+- **Heterogeneity** test (I², Q, τ²).
+- **Sensitivity analysis** (leave-one-out).
+- **Subgroup analysis**.
+- Forest plot + funnel plot outputs.
+
+### 3. Sample-size calculation — fully built out
+- Power / sample-size for the common designs (t-tests, ANOVA, proportions,
+  correlation, survival, etc.), with inputs for effect size, power, alpha.
+
+### 4. Data preview on upload
+- When data is uploaded, open an **Excel-style preview** of all the data, plus an
+  automatic **descriptive summary**: means, SDs, and preliminary significance,
+  organised **according to the study protocol**.
+
+### 5. Founder / about
+- Founder section with **your photo + your info** (About/Founder page).
+
+### 6. Diagnostic / biomedical statistics
+- Diagnostic-test metrics: **sensitivity, specificity, PPV, NPV**, accuracy,
+  **likelihood ratios**, diagnostic odds ratio, and **ROC curve + AUC**.
+- Agreement stats (Cohen's/Fleiss' kappa, Bland–Altman) as a natural extension.
+
+### 7. Require email verification before access
+- Gate the app so a new account must **verify its email** before running jobs
+  (verification flow already exists; this makes it mandatory). Small change.
+
+---
+
+## v2 — after v1
+- **Consultant marketplace**: directory of vetted consultants with profiles and
+  **ratings/reviews**; choosing a consultant routes the job to a human instead of
+  the AI pipeline. (The +3000 "full expert" add-on is the first step.)
+- **Blog / articles** section (SEO + credibility).
+- **Social media manager (Facebook + Instagram only, for now)** — writes the posts,
+  designs the images/graphics, and publishes them to Facebook & Instagram (via the
+  Meta Graph API). Content generation + image design + scheduling/auto-posting.
+
+---
+
+## Languages — how many we can offer
+The AI provider (DeepSeek) is strongly multilingual, so the **generated Results
+text** can be produced in many languages. Realistic plan:
+- **Start:** Arabic + English (Arabic needs RTL + encoding work — priority #1).
+- **Easy to add next:** French, Spanish, German, Hindi, and other major languages —
+  each needs (a) UI-string translation and (b) light QA of the generated academic
+  wording. The statistics engine itself is language-neutral.
+- **Bottom line:** output text ≈ any major language the model handles well; a fully
+  *translated UI* is added language-by-language. Hindi is very doable after Arabic.
+
+---
+
+## Smaller improvements (backlog)
 - Strip unused media from uploaded templates to keep output files small.
-- Let customers pick figure DPI / size.
+- Figure DPI / size options.
 - More journal presets as demand shows which journals customers target.
-- Inline figure/table placement (referenced in text) rather than grouped at the end.
+- Inline figure/table placement (referenced in text) vs grouped at the end.

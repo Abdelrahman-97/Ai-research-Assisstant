@@ -266,11 +266,16 @@ def write_results(run: Run) -> Run:
     run.status = RunStatus.writing
     _touch(run)
 
+    lang = run.output_language if run.output_language in ("en", "ar") else "en"
+    is_rtl = lang == "ar"
+    add_label = "تحليل إضافي" if is_rtl else "Additional analysis"
+
     try:
         markdown = results_writer.write_results(
             test=run.approved_test,
             execution=run.execution,
             scope=run.scope,
+            language=lang,
         )
         # Append the reliable, curated methodological evidence (real citation).
         ev_md = evidence.to_markdown(run.approved_test.evidence, run.approved_test.name)
@@ -286,10 +291,10 @@ def write_results(run: Run) -> Run:
             if not ex or ex.status != RunStatus.executed:
                 continue
             section = results_writer.write_results(
-                test=analysis.test, execution=ex, scope=run.scope
+                test=analysis.test, execution=ex, scope=run.scope, language=lang
             )
             ev2 = evidence.to_markdown(analysis.test.evidence, analysis.test.name)
-            markdown = f"{markdown}\n\n---\n\n## Additional analysis — {analysis.test.name}\n\n{section}"
+            markdown = f"{markdown}\n\n---\n\n## {add_label} — {analysis.test.name}\n\n{section}"
             if ev2:
                 markdown = f"{markdown}\n\n{ev2}"
             all_artifacts.extend(ex.artifacts)
@@ -311,9 +316,9 @@ def write_results(run: Run) -> Run:
                 template_path.write_bytes(got[1])
 
         report_writer.markdown_to_docx(
-            markdown, all_artifacts, docx_path, fmt=fmt, template_path=template_path
+            markdown, all_artifacts, docx_path, fmt=fmt, template_path=template_path, rtl=is_rtl
         )
-        report_writer.markdown_to_pdf(markdown, all_artifacts, pdf_path, fmt=fmt)
+        report_writer.markdown_to_pdf(markdown, all_artifacts, pdf_path, fmt=fmt, rtl=is_rtl)
         # Persist outputs to the shared blob store: durable across redeploys and
         # reachable by the API when the worker is what generated them.
         run.docx_blob_id = blobs.put(
