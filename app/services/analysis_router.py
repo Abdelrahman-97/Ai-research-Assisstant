@@ -92,9 +92,11 @@ def _validate_item(raw: dict, valid_cols: set[str]) -> EnginePlanItem | None:
         return None
     # every column-valued param must reference a real column (lists allowed for
     # predictors/variables). Non-column params (e.g. method) pass through.
+    column_params = {"outcome", "group", "pre", "post", "var1", "var2", "predictor",
+                     "rater1", "rater2", "method1", "method2", "time", "event",
+                     "within", "condition", "subject", "covariate"}
     for k, v in params.items():
-        if isinstance(v, str) and k in ("outcome", "group", "pre", "post", "var1", "var2",
-                                        "predictor") and v not in valid_cols:
+        if isinstance(v, str) and k in column_params and v not in valid_cols:
             return None
         if isinstance(v, list):
             bad = [c for c in v if c not in valid_cols]

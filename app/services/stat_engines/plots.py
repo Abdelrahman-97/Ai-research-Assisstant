@@ -77,6 +77,38 @@ def paired_lines(pre: list[float], post: list[float], *, labels=("Pre", "Post"),
     return _save(fig, path)
 
 
+def km_curves(curves: dict[str, dict], *, path: str | Path, xlabel: str = "Time") -> str:
+    """Kaplan-Meier step curves. `curves[label] = {'time': [...], 'surv': [...]}`."""
+    fig, ax = plt.subplots(figsize=(6, 4))
+    palette = [TEAL, "#b4462f", "#5b8fa8", "#d8a657", "#8a6fb0"]
+    for i, (label, c) in enumerate(curves.items()):
+        ax.step(c["time"], c["surv"], where="post", color=palette[i % len(palette)],
+                linewidth=2, label=str(label))
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Survival probability")
+    ax.set_ylim(0, 1.02)
+    ax.grid(alpha=0.3)
+    ax.legend()
+    return _save(fig, path)
+
+
+def bland_altman(means: list[float], diffs: list[float], *, bias: float, loa_low: float,
+                 loa_high: float, path: str | Path) -> str:
+    """Bland-Altman plot: differences vs means, with bias and limits of agreement."""
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.scatter(means, diffs, color=TEAL, alpha=0.7, edgecolors="white", s=40)
+    ax.axhline(bias, color="#b4462f", linewidth=1.5, label=f"Bias = {bias:.3g}")
+    ax.axhline(loa_high, color="#5b8fa8", linestyle="--", linewidth=1,
+               label=f"+1.96 SD = {loa_high:.3g}")
+    ax.axhline(loa_low, color="#5b8fa8", linestyle="--", linewidth=1,
+               label=f"-1.96 SD = {loa_low:.3g}")
+    ax.set_xlabel("Mean of the two measurements")
+    ax.set_ylabel("Difference between measurements")
+    ax.grid(alpha=0.3)
+    ax.legend(fontsize=8)
+    return _save(fig, path)
+
+
 def grouped_bar(row_labels: list[str], col_labels: list[str], counts: list[list[float]],
                 *, path: str | Path, ylabel: str = "Count") -> str:
     """Grouped bar chart for a contingency table."""

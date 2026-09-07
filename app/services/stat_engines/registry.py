@@ -12,7 +12,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.services.stat_engines import associations, comparisons, descriptives
+from app.services.stat_engines import (
+    agreement, anova_models, associations, comparisons, descriptives,
+    regression_models, survival,
+)
 from app.services.stat_engines.base import EngineError
 
 # key -> spec. `params` documents the keys each engine expects (for the router
@@ -78,6 +81,60 @@ REGISTRY: dict[str, dict] = {
         "fn": associations.linear_regression,
         "params": {"outcome": "numeric column", "predictors": "list of predictor columns"},
         "when": "Model a numeric outcome from one or more predictors; gives coefficients, R², CIs.",
+    },
+    "logistic_regression": {
+        "title": "Logistic regression",
+        "fn": regression_models.logistic_regression,
+        "params": {"outcome": "binary column", "predictors": "list of predictor columns"},
+        "when": "Model a BINARY outcome (yes/no) from predictors; gives odds ratios with CIs.",
+    },
+    "ancova": {
+        "title": "ANCOVA",
+        "fn": regression_models.ancova,
+        "params": {"outcome": "numeric column", "group": "grouping column",
+                   "covariates": "list of numeric covariates to adjust for"},
+        "when": "Compare a numeric outcome across groups while adjusting for covariate(s).",
+    },
+    "repeated_measures_anova": {
+        "title": "Repeated-measures ANOVA",
+        "fn": anova_models.repeated_measures_anova,
+        "params": {"subject": "subject id column", "within": "condition/time column",
+                   "outcome": "numeric column"},
+        "when": "Compare a numeric outcome across conditions/time measured on the SAME subjects "
+                "(long format: one row per subject × condition).",
+    },
+    "survival_logrank": {
+        "title": "Kaplan-Meier / log-rank",
+        "fn": survival.survival_logrank,
+        "params": {"time": "time-to-event column", "event": "event column (1=event, 0=censored)",
+                   "group": "optional grouping column"},
+        "when": "Time-to-event (survival) analysis: Kaplan-Meier curves and the log-rank test "
+                "comparing groups.",
+    },
+    "cox_regression": {
+        "title": "Cox proportional-hazards regression",
+        "fn": regression_models.cox_regression,
+        "params": {"time": "time-to-event column", "event": "event column (1=event, 0=censored)",
+                   "predictors": "list of predictor columns"},
+        "when": "Model time-to-event outcomes from predictors; gives hazard ratios with CIs.",
+    },
+    "cohens_kappa": {
+        "title": "Cohen's kappa",
+        "fn": agreement.cohens_kappa,
+        "params": {"rater1": "first rater's categorical column", "rater2": "second rater's column"},
+        "when": "Inter-rater agreement between TWO raters on a categorical rating.",
+    },
+    "icc": {
+        "title": "Intraclass correlation (ICC)",
+        "fn": agreement.icc,
+        "params": {"raters": "list of 2+ numeric rater/measurement columns"},
+        "when": "Reliability/agreement of numeric measurements across 2+ raters or repeats.",
+    },
+    "bland_altman": {
+        "title": "Bland-Altman agreement",
+        "fn": agreement.bland_altman,
+        "params": {"method1": "numeric column (method A)", "method2": "numeric column (method B)"},
+        "when": "Agreement between TWO measurement methods (bias + limits of agreement).",
     },
 }
 
