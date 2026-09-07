@@ -52,6 +52,20 @@ function syncTopbar() {
   document.getElementById("logoutBtn").classList.toggle("hidden", !state.user);
 }
 
+/* Clicking the Neura logo returns to the dashboard (or the login screen if
+ * signed out). The topbar persists across renders, so wire this once at load. */
+(function setupBrandHome() {
+  const brand = document.getElementById("brandHome");
+  if (!brand) return;
+  const go = () => {
+    state.run = null; state.runId = null;
+    state.view = state.token ? "dashboard" : "auth";
+    render();
+  };
+  brand.onclick = go;
+  brand.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
+})();
+
 document.getElementById("logoutBtn").onclick = () => {
   state.token = null; state.user = null; state.run = null; state.runId = null;
   localStorage.removeItem("ra_token");
