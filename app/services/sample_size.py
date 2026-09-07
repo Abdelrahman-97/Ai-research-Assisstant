@@ -300,3 +300,96 @@ def calculate(design: str, params: dict) -> dict:
         return fn(**params)
     except TypeError as exc:
         raise SampleSizeError(f"Missing or invalid parameters: {exc}") from exc
+
+
+def _power_at_total(design: str, inp: dict, ntot: float) -> float | None:
+    """Achieved power for a given TOTAL sample size (for the power curve)."""
+    alpha = inp.get("alpha", 0.05)
+    alt = inp.get("alternative", "two-sided")
+    try:
+        if design == "two_means":
+            ratio = inp.get("ratio", 1.0)
+            n1 = ntot / (1 + ratio)
+            if n1 < 2:
+                return None
+            return float(TTestIndPower().power(effect_size=abs(inp["effect_size"]), nobs1=n1,
+                                               alpha=alpha, ratio=ratio, alternative=alt))
+        if design in ("paired_means", "one_mean"):
+            if ntot < 2:
+                return None
+            return float(TTestPower().power(effect_size=abs(inp["effect_size"]), nobs=ntot,
+                                            alpha=alpha, alternative=alt))
+        if design == "two_proportions":
+            ratio = inp.get("ratio", 1.0)
+            n1 = ntot / (1 + ratio)
+            if n1 < 2:
+                return None
+            es = proportion_effectsize(inp["p1"], inp["p2"])
+            return float(NormalIndPower().power(effect_size=abs(es), nobs1=n1, alpha=alpha,
+                                                ratio=ratio, alternative=alt))
+        if design == "anova":
+            return float(FTestAnovaPower().power(effect_size=inp["effect_size"], nobs=ntot,
+                                                 alpha=alpha, k_groups=inp["k_groups"]))
+        if design == "chi_square":
+            return float(GofChisquarePower().power(effect_size=inp["effect_size"], nobs=ntot,
+                                                   alpha=alpha, n_bins=inp["df"] + 1))
+        if design == "one_proportion":
+            p1, p0 = inp["p1"], inp["p0"]
+            za = _z(alpha, alt)
+            zb = (abs(p1 - p0) * math.sqrt(ntot) - za * math.sqrt(p0 * (1 - p0))) / math.sqrt(p1 * (1 - p1))
+            return float(stats.norm.cdf(zb))
+        if design == "correlation":
+            r = abs(inp["r"])
+            c = 0.5 * math.log((1 + r) / (1 - r))
+            za = _z(alpha, alt)
+            return float(stats.norm.cdf(c * math.sqrt(ntot - 3) - za))
+    except Exception:  # noqa: BLE001
+        return None
+    return None
+
+
+# Designs for which a power-vs-N curve is meaningful (effect-based).
+_POWER_CURVE_DESIGNS = {"two_means", "paired_means", "one_mean", "two_proportions",
+                        "one_proportion", "anova", "chi_square", "correlation"}
+
+
+def power_curve(result: dict, path) -> str | None:
+    """Draw a power-vs-total-sample-size curve for a solved result. Returns the PNG
+    path, or None when a curve isn't applicable (e.g. survival/regression)."""
+    design = result.get("design")
+    if design not in _POWER_CURVE_DESIGNS or result.get("solve") == "power":
+        return None
+    target = result.get("total")
+    inp = result.get("inputs", {})
+    if not target:
+        return None
+
+    import numpy as np
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    lo = max(4, int(target * 0.3))
+    hi = max(lo + 10, int(target * 1.9))
+    xs = np.linspace(lo, hi, 40)
+    pts = [(float(x), _power_at_total(design, inp, float(x))) for x in xs]
+    pts = [(x, y) for x, y in pts if y is not None]
+    if len(pts) < 3:
+        return None
+
+    target_power = inp.get("power", 0.80)
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot([p[0] for p in pts], [p[1] for p in pts], color="#0a6b63", linewidth=2)
+    ax.axhline(target_power, color="#b4462f", linestyle="--", linewidth=1,
+               label=f"Target power = {target_power:.0%}")
+    ax.axvline(target, color="#5b8fa8", linestyle=":", linewidth=1,
+               label=f"Required N = {int(target)}")
+    ax.set_xlabel("Total sample size")
+    ax.set_ylabel("Statistical power")
+    ax.set_ylim(0, 1.02)
+    ax.grid(alpha=0.3)
+    ax.legend(loc="lower right")
+    fig.tight_layout()
+    fig.savefig(str(path), dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return str(path)

@@ -41,6 +41,23 @@ _REFS: dict[str, str] = {
     "thompson2002": "Thompson, S. G., & Higgins, J. P. T. (2002). How should meta-regression analyses be undertaken and interpreted? Statistics in Medicine, 21(11), 1559–1573.",
     "lau1992": "Lau, J., Antman, E. M., Jimenez-Silva, J., et al. (1992). Cumulative meta-analysis of therapeutic trials for myocardial infarction. New England Journal of Medicine, 327(4), 248–254.",
 
+    # --- Classical tests (Results-section engines) ---
+    "student1908": "Student [Gosset, W. S.] (1908). The probable error of a mean. Biometrika, 6(1), 1–25.",
+    "welch1947": "Welch, B. L. (1947). The generalization of 'Student's' problem when several different population variances are involved. Biometrika, 34(1–2), 28–35.",
+    "levene1960": "Levene, H. (1960). Robust tests for equality of variances. In Contributions to Probability and Statistics (pp. 278–292). Stanford University Press.",
+    "shapiro1965": "Shapiro, S. S., & Wilk, M. B. (1965). An analysis of variance test for normality (complete samples). Biometrika, 52(3–4), 591–611.",
+    "fisher1925": "Fisher, R. A. (1925). Statistical Methods for Research Workers. Oliver & Boyd.",
+    "pearson1895": "Pearson, K. (1895). Notes on regression and inheritance in the case of two parents. Proceedings of the Royal Society of London, 58, 240–242.",
+    "spearman1904": "Spearman, C. (1904). The proof and measurement of association between two things. American Journal of Psychology, 15(1), 72–101.",
+    "mann1947": "Mann, H. B., & Whitney, D. R. (1947). On a test of whether one of two random variables is stochastically larger than the other. Annals of Mathematical Statistics, 18(1), 50–60.",
+    "wilcoxon1945": "Wilcoxon, F. (1945). Individual comparisons by ranking methods. Biometrics Bulletin, 1(6), 80–83.",
+    "kruskal1952": "Kruskal, W. H., & Wallis, W. A. (1952). Use of ranks in one-criterion variance analysis. Journal of the American Statistical Association, 47(260), 583–621.",
+    "pearson1900": "Pearson, K. (1900). On the criterion that a given system of deviations… can be reasonably supposed to have arisen from random sampling. Philosophical Magazine, 50(302), 157–175.",
+    "cramer1946": "Cramér, H. (1946). Mathematical Methods of Statistics. Princeton University Press.",
+    "montgomery2012": "Montgomery, D. C., Peck, E. A., & Vining, G. G. (2012). Introduction to Linear Regression Analysis (5th ed.). Wiley.",
+    "hosmer2013": "Hosmer, D. W., Lemeshow, S., & Sturdivant, R. X. (2013). Applied Logistic Regression (3rd ed.). Wiley.",
+    "tukey1949": "Tukey, J. W. (1949). Comparing individual means in the analysis of variance. Biometrics, 5(2), 99–114.",
+
     # --- Diagnostic accuracy ---
     "altman1994": "Altman, D. G., & Bland, J. M. (1994). Diagnostic tests 1: sensitivity and specificity. BMJ, 308(6943), 1552.",
     "deeks2004": "Deeks, J. J., & Altman, D. G. (2004). Diagnostic tests 4: likelihood ratios. BMJ, 329(7458), 168–169.",

@@ -73,6 +73,10 @@ def _sample_size(inp: dict, r: dict) -> str:
         md.append("\nThis is the number required to detect the effect size you specified, at your chosen "
                   "significance level (alpha) and power. If you expect drop-out, enrol more so the *completed* "
                   "sample meets this target.")
+        from app.services.sample_size import _POWER_CURVE_DESIGNS
+        if r.get("design") in _POWER_CURVE_DESIGNS:
+            md.append("\nThe **power curve** figure shows how statistical power rises with the total sample "
+                      "size, with your target power and the required N marked.")
     return "\n".join(md) + _refs_block(r.get("references", []))
 
 

@@ -219,6 +219,15 @@ def compute_tool(run: Run) -> Run:
             artifacts = [Artifact(kind="figure", path=str(rp), caption="ROC curve")]
         except Exception:  # noqa: BLE001
             artifacts = []
+    elif run.task == TaskType.sample_size:
+        try:
+            art_dir = out_dir / "artifacts" / run.id
+            art_dir.mkdir(parents=True, exist_ok=True)
+            pc = art_dir / "power_curve.png"
+            if sample_size.power_curve(result, str(pc)):
+                artifacts = [Artifact(kind="figure", path=str(pc), caption="Power curve")]
+        except Exception:  # noqa: BLE001
+            artifacts = []
 
     # Build the report body. Meta-analysis is written up as a thesis/paper Results
     # section: an AI narrative grounded strictly in the deterministic numbers,
