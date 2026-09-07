@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 300" font-family="DejaVu Sans, sans-serif">
+  <!-- neural-N glyph -->
+  <g transform="translate(70,80)" stroke="#6366F1" stroke-width="14" stroke-linecap="round" fill="none">
+    <line x1="0" y1="0" x2="0" y2="112"/>
+    <line x1="86" y1="0" x2="86" y2="112"/>
+    <line x1="0" y1="0" x2="86" y2="112"/>
+  </g>
+  <g transform="translate(70,80)" fill="#6366F1">
+    <circle cx="0" cy="0" r="13"/>
+    <circle cx="0" cy="112" r="13"/>
+    <circle cx="86" cy="112" r="13"/>
+    <circle cx="43" cy="56" r="11"/>
+    <circle cx="86" cy="0" r="17"/>
+    <circle cx="86" cy="0" r="28" fill="none" stroke="#6366F1" stroke-width="3.5" opacity="0.5"/>
+  </g>
+  <text x="196" y="204" fill="#1C1A17" font-size="150" font-weight="bold" letter-spacing="-4">eura</text>
+</svg>

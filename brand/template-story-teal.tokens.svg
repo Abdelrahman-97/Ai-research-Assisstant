@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920">
+  <rect width="1080" height="1920" fill="#0a6b63"/>
+  <g><line x1="369" y1="274" x2="483" y2="218" stroke="#4cc2b6" stroke-width="2" opacity="0.19"/><line x1="483" y1="218" x2="597" y2="294" stroke="#4cc2b6" stroke-width="2" opacity="0.19"/><line x1="369" y1="274" x2="426" y2="398" stroke="#4cc2b6" stroke-width="2" opacity="0.19"/><line x1="426" y1="398" x2="568" y2="417" stroke="#4cc2b6" stroke-width="2" opacity="0.19"/><line x1="568" y1="417" x2="682" y2="350" stroke="#4cc2b6" stroke-width="2" opacity="0.19"/><line x1="597" y1="294" x2="682" y2="350" stroke="#4cc2b6" stroke-width="2" opacity="0.19"/><line x1="426" y1="398" x2="502" y2="493" stroke="#4cc2b6" stroke-width="2" opacity="0.19"/><line x1="502" y1="493" x2="626" y2="446" stroke="#4cc2b6" stroke-width="2" opacity="0.19"/><line x1="568" y1="417" x2="626" y2="446" stroke="#4cc2b6" stroke-width="2" opacity="0.19"/><circle cx="369" cy="274" r="9" fill="#4cc2b6" opacity="0.32"/><circle cx="483" cy="218" r="6" fill="#4cc2b6" opacity="0.32"/><circle cx="597" cy="294" r="6" fill="#4cc2b6" opacity="0.32"/><circle cx="426" cy="398" r="9" fill="#4cc2b6" opacity="0.32"/><circle cx="568" cy="417" r="6" fill="#4cc2b6" opacity="0.32"/><circle cx="682" cy="350" r="6" fill="#4cc2b6" opacity="0.32"/><circle cx="502" cy="493" r="9" fill="#4cc2b6" opacity="0.32"/><circle cx="626" cy="446" r="6" fill="#4cc2b6" opacity="0.32"/></g>
+  <text x="540" y="900" text-anchor="middle" font-family="Georgia, 'Times New Roman', 'DejaVu Serif', serif" font-size="80" font-weight="700" fill="#ffffff">{{HEADLINE}}</text>
+  <text x="540" y="1000" text-anchor="middle" font-family="'DejaVu Sans', Arial, sans-serif" font-size="36" fill="#d6efeb">{{BODY}}</text>
+  <g transform="translate(390,1560) scale(1.4)">
+      <rect width="64" height="64" rx="14" fill="#0a6b63"/>
+      <g fill="none" stroke="#ffffff" stroke-width="6.5" stroke-linecap="round">
+        <line x1="20" y1="18" x2="20" y2="46"/><line x1="44" y1="18" x2="44" y2="46"/><line x1="20" y1="18" x2="44" y2="46"/>
+      </g>
+      <g fill="#ffffff"><circle cx="20" cy="18" r="4.5"/><circle cx="20" cy="46" r="4.5"/><circle cx="44" cy="46" r="4.5"/></g>
+      <circle cx="44" cy="18" r="5.6" fill="#4cc2b6"/></g><text x="480" y="1606" font-family="Georgia, 'Times New Roman', 'DejaVu Serif', serif" font-size="46" font-weight="700" fill="#ffffff">Neura</text><text x="482" y="1634" font-family="'DejaVu Sans', Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="6" fill="#cfeae6">RESEARCH</text>
+</svg>

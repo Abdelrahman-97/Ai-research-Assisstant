@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" font-family="DejaVu Sans, sans-serif">
+  <rect width="500" height="500" fill="#6366F1"/>
+  <!-- white neural-N centered -->
+  <g transform="translate(175,150)" stroke="#FFFFFF" stroke-width="22" stroke-linecap="round" fill="none">
+    <line x1="0" y1="0" x2="0" y2="200"/>
+    <line x1="150" y1="0" x2="150" y2="200"/>
+    <line x1="0" y1="0" x2="150" y2="200"/>
+  </g>
+  <g transform="translate(175,150)" fill="#FFFFFF">
+    <circle cx="0" cy="0" r="20"/>
+    <circle cx="0" cy="200" r="20"/>
+    <circle cx="150" cy="200" r="20"/>
+    <circle cx="75" cy="100" r="17"/>
+    <circle cx="150" cy="0" r="26"/>
+    <circle cx="150" cy="0" r="42" fill="none" stroke="#FFFFFF" stroke-width="5" opacity="0.55"/>
+  </g>
+</svg>

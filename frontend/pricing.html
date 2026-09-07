@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Services & Pricing — Neura</title>
+  <meta name="description" content="Neura — AI-assisted statistical analysis and results write-up for researchers. Services, pricing, and how it works." />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="favicon.svg" />
+  <meta name="theme-color" content="#0a6b63" />
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("neura_theme");
+        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+  <style>
+    .ptable { list-style:none; padding:0; margin:14px 0; }
+    .ptable li { display:flex; justify-content:space-between; gap:16px; padding:11px 2px; border-bottom:1px solid var(--line); }
+    .ptable .k { color:var(--ink); } .ptable .v { font-weight:600; white-space:nowrap; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><svg width="20" height="20" viewBox="0 0 64 64" style="vertical-align:-3px" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"><line x1="20" y1="18" x2="20" y2="46"/><line x1="44" y1="18" x2="44" y2="46"/><line x1="20" y1="18" x2="44" y2="46"/><circle cx="44" cy="18" r="7" fill="currentColor" stroke="none"/></svg><span class="brand-word">Neura<span class="brand-sub">RESEARCH</span></span></div>
+    <a class="btn btn-primary" href="index.html" style="padding:8px 18px;font-size:14px;">Start your analysis →</a>
+  </header>
+
+  <main class="app">
+    <div class="card">
+      <h1>Services &amp; pricing</h1>
+      <p class="sub">Neura is an AI-assisted service that helps researchers and postgraduate students analyse their data and produce a publication-ready Results section — reviewed by a published researcher. Output in English or Arabic, delivered as Word and PDF. All prices in Egyptian Pounds (EGP).</p>
+    </div>
+
+    <div class="card">
+      <h2>What we offer</h2>
+      <p class="sub">You always see a transparent, itemised price before any payment. Payment-gateway fees are shown at checkout.</p>
+
+      <h3 style="margin-top:16px;">1. Results section (statistical analysis + write-up)</h3>
+      <ul class="ptable">
+        <li><span class="k">Base — thesis chapter</span><span class="v">600 EGP</span></li>
+        <li><span class="k">Base — paper / study results section</span><span class="v">350 EGP</span></li>
+        <li><span class="k">Per statistical test</span><span class="v">100 EGP</span></li>
+        <li><span class="k">Per 1,000 words of results text</span><span class="v">40 EGP</span></li>
+        <li><span class="k">Per 1,000 data cells</span><span class="v">10 EGP</span></li>
+      </ul>
+      <p class="muted-note">Example: a paper with 4 tests, 3,000 words and a 5,000-cell dataset ≈ <strong>920 EGP</strong>.</p>
+
+      <h3 style="margin-top:20px;">2. Meta-analysis</h3>
+      <ul class="ptable"><li><span class="k">Comprehensive meta-analysis report (pooled effect, heterogeneity, subgroups, publication bias, forest &amp; funnel plots)</span><span class="v">750 EGP</span></li></ul>
+
+      <h3 style="margin-top:12px;">3. Sample-size / power calculation</h3>
+      <ul class="ptable"><li><span class="k">Cited sample-size report for your design</span><span class="v">150 EGP</span></li></ul>
+
+      <h3 style="margin-top:12px;">4. Diagnostic accuracy</h3>
+      <ul class="ptable"><li><span class="k">Sensitivity, specificity, predictive values, likelihood ratios, ROC/AUC</span><span class="v">150 EGP</span></li></ul>
+
+      <h3 style="margin-top:20px;">Optional add-ons</h3>
+      <ul class="ptable">
+        <li><span class="k">Analyst chat — Standard tier</span><span class="v">+75 EGP</span></li>
+        <li><span class="k">Analyst chat — Pro tier</span><span class="v">+200 EGP</span></li>
+        <li><span class="k">Expert review of the results</span><span class="v">+500 EGP</span></li>
+        <li><span class="k">Full analysis by a statistician</span><span class="v">+3,000 EGP</span></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>How it works</h2>
+      <p class="sub">1. Create an account and upload your protocol + data. 2. See your itemised price — free, no charge yet. 3. Pay securely. 4. Approve the proposed statistical plan (you're in control). 5. We run the analysis and write the Results. 6. Download your Word &amp; PDF.</p>
+      <div class="btn-row"><a class="btn btn-primary" href="index.html">Create an account &amp; get a price</a></div>
+    </div>
+
+    <div class="card">
+      <h2>Policies &amp; contact</h2>
+      <p class="sub">
+        <a class="link" href="terms.html">Terms of Service</a> ·
+        <a class="link" href="refund.html">Refund Policy</a> ·
+        <a class="link" href="privacy.html">Privacy Policy</a> ·
+        <a class="link" href="about.html">About the founder</a>
+      </p>
+      <p class="muted-note">Support: <a class="js-support-email link" href="#">email</a> · <a class="js-support-whatsapp link" href="#">WhatsApp</a></p>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <a href="index.html">Home</a>·<a href="about.html">About</a>·<a href="blog.html">Blog</a>·
+    <a href="terms.html">Terms</a>·<a href="refund.html">Refund</a>·<a href="privacy.html">Privacy</a>
+  </footer>
+
+  <script src="config.js"></script>
+  <script src="contact.js"></script>
+</body>
+</html>

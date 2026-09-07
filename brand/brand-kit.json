@@ -1,0 +1,19 @@
+{
+  "brand": "Neura (NeuraRESEARCH)",
+  "colors": { "teal": "#0a6b63", "soft_teal": "#4cc2b6", "ink": "#1a2b32", "bg": "#f4f6f6", "muted": "#5f6f75" },
+  "fonts": { "headline": "serif (Georgia / Times New Roman / DejaVu Serif)", "body": "sans (DejaVu Sans / Arial)" },
+  "logos": {
+    "profile": "logo-icon-teal.png",
+    "on_light": "logo-icon-transparent.png",
+    "horizontal_lockup": "logo-horizontal.png",
+    "facebook_cover": "facebook-cover.png"
+  },
+  "how_to_fill": "Each *.tokens.svg contains {{HEADLINE}} and {{BODY}} placeholders. Replace those two strings with your generated text, then render the SVG to PNG (e.g. cairosvg) at the size below. This keeps the exact brand layout and correct fonts.",
+  "templates": [
+    { "name": "post_light",  "svg": "template-post-light.tokens.svg",  "png_preview": "template-post-light.png",  "width": 1080, "height": 1080, "use": "Facebook / Instagram feed post (light)" },
+    { "name": "post_teal",   "svg": "template-post-teal.tokens.svg",   "png_preview": "template-post-teal.png",   "width": 1080, "height": 1080, "use": "Facebook / Instagram feed post (teal)" },
+    { "name": "story_light", "svg": "template-story-light.tokens.svg", "png_preview": "template-story-light.png", "width": 1080, "height": 1920, "use": "FB / IG / WhatsApp story (light)", "safe_margins_pct": 12 },
+    { "name": "story_teal",  "svg": "template-story-teal.tokens.svg",  "png_preview": "template-story-teal.png",  "width": 1080, "height": 1920, "use": "FB / IG / WhatsApp story (teal)", "safe_margins_pct": 12 }
+  ],
+  "tokens": { "headline": "{{HEADLINE}}", "body": "{{BODY}}" }
+}
