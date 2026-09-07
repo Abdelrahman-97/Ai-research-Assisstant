@@ -35,19 +35,23 @@ from app.models.schemas import (
     Analysis,
     AssistantAction,
     ChatMessage,
+    EnginePlan,
     Language,
     ProposedTest,
     Run,
     RunStatus,
 )
-from app.services import evidence, integrity_checker, orchestrator
+from app.services import analysis_router, evidence, integrity_checker, orchestrator
 from app.services.llm_client import LLMClient
+from app.services.stat_engines import registry as engine_registry
 from app.store import blobs, repository
 
 # Action types the model is allowed to emit. Anything else becomes a plain reply.
 _ALLOWED = {
     "none", "explain", "set_test", "edit_variables", "set_word_count",
     "regenerate_script", "run_analysis", "write_results", "filter_data", "add_test",
+    # engine-first plan editing
+    "set_engines", "add_engine", "remove_engine",
 }
 
 # Statuses at which the plan (test choice / variables) may still be changed.
@@ -101,11 +105,22 @@ Allowed action types and their params:
 - "add_test": add ANOTHER statistical test to this run.
   params: {{"name": "...", "reasoning": "...", "variables": ["..."]}}
 
+If this run is in ENGINE MODE (see context), prefer these audited-engine actions
+over set_test/add_test, using ONLY engine keys and column names listed in context:
+- "set_engines": replace the whole analysis plan with audited engines.
+  params: {{"analyses": [{{"engine":"independent_ttest",
+            "params": {{"outcome":"score","group":"arm"}}, "reasoning":"..."}}]}}
+- "add_engine": add ONE audited engine to the plan.
+  params: {{"engine":"correlation", "params":{{"var1":"age","var2":"score"}}, "reasoning":"..."}}
+- "remove_engine": remove one engine from the plan.
+  params: {{"engine":"correlation"}}  (or {{"index": 0}})
+
 Rules:
 - Pick the single most helpful action. If the user is only asking a question, use
   "explain" (or "none"). Only choose a state-changing action when they clearly ask
   to change or run something.
 - Use ONLY column names that exist in the data summary below.
+- In engine mode, use ONLY engine keys from the "Available engines" list in context.
 - Keep "reply" concise and specific to their study.
 
 --- CURRENT RUN CONTEXT ---
@@ -131,8 +146,15 @@ def _format_context(run: Run) -> str:
             f"Data: {run.data_summary.n_rows} rows x {run.data_summary.n_cols} cols. "
             f"Columns: {cols}"
         )
+    if run.analysis_mode == "engine" and run.engine_plan and run.engine_plan.items:
+        items = "; ".join(
+            f"{it.engine}(" + ", ".join(f"{k}={v}" for k, v in (it.params or {}).items()) + ")"
+            for it in run.engine_plan.items
+        )
+        lines.append(f"ENGINE MODE. Current engine plan: {items}")
+        lines.append("Available engines: " + ", ".join(e["key"] for e in engine_registry.catalogue()))
     current = run.approved_test or run.proposed_test
-    if current:
+    if current and run.analysis_mode != "engine":
         lines.append(
             f"Current test: {current.name} | variables: {', '.join(current.variables) or '(none)'}"
         )
@@ -195,6 +217,10 @@ def _set_test(run: Run, name: str, reasoning: str, variables: list[str]) -> str:
     )
     evidence.attach(test)
     run.proposed_test = test
+    # A free-text named test uses the script path; leave engine mode.
+    run.analysis_mode = "script"
+    run.engine_plan = None
+    run.engine_results = None
     # Changing the test invalidates any approved plan / script / execution:
     run.approved_test = None
     run.script = None
@@ -345,6 +371,79 @@ def _apply_add_test(run: Run, params: dict) -> str:
     )
 
 
+def _valid_cols(run: Run) -> set[str]:
+    return {c.name for c in run.data_summary.columns} if run.data_summary else set()
+
+
+def _reset_after_plan_change(run: Run) -> None:
+    """A changed engine plan invalidates any approval / run / results."""
+    run.approved_test = None
+    run.script = None
+    run.execution = None
+    run.engine_results = None
+    run.error = None
+    if run.status in (_PRE_RUN | {RunStatus.completed}):
+        run.status = RunStatus.awaiting_approval
+
+
+def _apply_set_engines(run: Run, params: dict) -> str:
+    if run.status not in (_PRE_RUN | {RunStatus.completed}):
+        raise AssistantError("The analysis plan can only be changed before results are accepted.")
+    raw_list = params.get("analyses")
+    if not isinstance(raw_list, list) or not raw_list:
+        raise AssistantError("Tell me which audited analyses to run.")
+    valid_cols = _valid_cols(run)
+    items = []
+    for raw in raw_list:
+        item = analysis_router._validate_item(raw, valid_cols)
+        if item:
+            items.append(item)
+    if not items:
+        raise AssistantError("None of those matched an audited engine and your columns.")
+    run.analysis_mode = "engine"
+    run.engine_plan = EnginePlan(items=items, fallback_to_script=False)
+    run.proposed_test = orchestrator._engine_plan_summary_test(run.engine_plan)
+    _reset_after_plan_change(run)
+    names = ", ".join(i.label or i.engine for i in items)
+    return f"Set the analysis plan to: {names}. Review and approve to run."
+
+
+def _apply_add_engine(run: Run, params: dict) -> str:
+    if run.status not in (_PRE_RUN | {RunStatus.completed}):
+        raise AssistantError("The plan can only be changed before results are accepted.")
+    item = analysis_router._validate_item(params, _valid_cols(run))
+    if not item:
+        raise AssistantError("That didn't match an audited engine and your columns.")
+    if run.analysis_mode != "engine" or run.engine_plan is None:
+        run.analysis_mode = "engine"
+        run.engine_plan = EnginePlan(items=[], fallback_to_script=False)
+    run.engine_plan.items.append(item)
+    run.proposed_test = orchestrator._engine_plan_summary_test(run.engine_plan)
+    _reset_after_plan_change(run)
+    return f"Added '{item.label or item.engine}' to the plan. Review and approve to run."
+
+
+def _apply_remove_engine(run: Run, params: dict) -> str:
+    if run.analysis_mode != "engine" or not run.engine_plan or not run.engine_plan.items:
+        raise AssistantError("There's no engine plan to change.")
+    items = run.engine_plan.items
+    key = params.get("engine")
+    idx = params.get("index")
+    before = len(items)
+    if isinstance(idx, int) and 0 <= idx < before:
+        items.pop(idx)
+    elif key:
+        items = [it for it in items if it.engine != key]
+    else:
+        raise AssistantError("Tell me which analysis to remove (name or position).")
+    if not items:
+        raise AssistantError("A plan needs at least one analysis — add another before removing this one.")
+    run.engine_plan.items = items
+    run.proposed_test = orchestrator._engine_plan_summary_test(run.engine_plan)
+    _reset_after_plan_change(run)
+    return "Updated the analysis plan. Review and approve to run."
+
+
 def apply(run: Run, action: AssistantAction) -> str:
     """Validate and execute a whitelisted action. Returns a note for the user."""
     t = action.type
@@ -369,6 +468,12 @@ def apply(run: Run, action: AssistantAction) -> str:
         return _apply_filter_data(run, p)
     if t == "add_test":
         return _apply_add_test(run, p)
+    if t == "set_engines":
+        return _apply_set_engines(run, p)
+    if t == "add_engine":
+        return _apply_add_engine(run, p)
+    if t == "remove_engine":
+        return _apply_remove_engine(run, p)
     return ""
 
 
