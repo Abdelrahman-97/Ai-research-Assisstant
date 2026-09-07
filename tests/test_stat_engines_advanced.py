@@ -37,7 +37,28 @@ def _png(p):
 
 
 def test_registry_has_all_engines():
-    assert len(catalogue()) >= 21
+    assert len(catalogue()) >= 22
+
+
+def test_kruskal_dunn_posthoc():
+    rng = np.random.default_rng(9)
+    g = np.array(["A", "B", "C"] * 20)
+    d = pd.DataFrame({"g": g, "y": np.select([g == "A", g == "B", g == "C"], [5, 7, 11])
+                      + rng.normal(0, 1.5, 60)})
+    r = run_engine("kruskal_wallis", d, {"outcome": "y", "group": "g"})
+    ph = r["values"]["posthoc_dunn"]
+    assert len(ph) == 3 and all("p_bonferroni" in c for c in ph)
+
+
+def test_two_way_anova():
+    rng = np.random.default_rng(4)
+    a = np.array(["x", "y"] * 30)
+    b = np.array((["p", "q", "r"] * 20))
+    d = pd.DataFrame({"a": a, "b": b, "y": rng.normal(0, 1, 60) + (a == "y") * 2})
+    r = run_engine("two_way_anova", d, {"outcome": "y", "factor1": "a", "factor2": "b"})
+    eff = r["values"]["effects"]
+    assert {"factor1", "factor2", "interaction"} <= set(eff)
+    assert eff["factor1"]["partial_eta_sq"] is not None
 
 
 def test_anova_posthoc_and_normality():

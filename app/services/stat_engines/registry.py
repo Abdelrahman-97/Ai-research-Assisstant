@@ -136,6 +136,14 @@ REGISTRY: dict[str, dict] = {
         "params": {"method1": "numeric column (method A)", "method2": "numeric column (method B)"},
         "when": "Agreement between TWO measurement methods (bias + limits of agreement).",
     },
+    "two_way_anova": {
+        "title": "Two-way ANOVA",
+        "fn": anova_models.two_way_anova,
+        "params": {"outcome": "numeric column", "factor1": "first factor column",
+                   "factor2": "second factor column"},
+        "when": "Compare a numeric outcome across TWO categorical factors and test their "
+                "interaction (factorial design).",
+    },
     "friedman": {
         "title": "Friedman test",
         "fn": anova_models.friedman,

@@ -301,6 +301,32 @@ def wilcoxon(df: pd.DataFrame, params: dict, fig_dir: str | Path | None = None) 
             "assumptions": ["Paired/related observations", "Ordinal or continuous differences"]}
 
 
+def _dunn_posthoc(sub: pd.DataFrame, levels: list) -> list[dict]:
+    """Dunn's post-hoc test (Bonferroni-adjusted) after Kruskal-Wallis."""
+    N = len(sub)
+    ranks = stats.rankdata(sub["y"].values)
+    sub = sub.assign(_r=ranks)
+    mean_rank = {lv: sub[sub.g == lv]["_r"].mean() for lv in levels}
+    n_i = {lv: int((sub.g == lv).sum()) for lv in levels}
+    # tie correction
+    _, counts = np.unique(sub["y"].values, return_counts=True)
+    tie = sum(t ** 3 - t for t in counts)
+    sigma2 = (N * (N + 1) / 12) * (1 - tie / (N ** 3 - N)) if (N ** 3 - N) else N * (N + 1) / 12
+    m = len(levels) * (len(levels) - 1) // 2   # comparisons for Bonferroni
+    out = []
+    for i in range(len(levels)):
+        for j in range(i + 1, len(levels)):
+            a, b = levels[i], levels[j]
+            se = math.sqrt(sigma2 * (1 / n_i[a] + 1 / n_i[b]))
+            z = (mean_rank[a] - mean_rank[b]) / se if se else 0.0
+            p = 2 * (1 - stats.norm.cdf(abs(z)))
+            p_adj = min(1.0, p * m)
+            out.append({"group1": str(a), "group2": str(b), "z": round4(z),
+                        "p_value": float(p), "p_bonferroni": float(p_adj),
+                        "significant": bool(p_adj < 0.05)})
+    return out
+
+
 def kruskal_wallis(df: pd.DataFrame, params: dict, fig_dir: str | Path | None = None) -> dict:
     outcome, group = params.get("outcome"), params.get("group")
     sub = _two_group_frame(df, outcome, group)
@@ -312,10 +338,12 @@ def kruskal_wallis(df: pd.DataFrame, params: dict, fig_dir: str | Path | None = 
     n = len(sub)
     k = len(levels)
     eps2 = (h - k + 1) / (n - k) if (n - k) else None  # epsilon-squared
+    posthoc = _dunn_posthoc(sub, levels) if k > 2 else []
     values = {
         "groups": {lv: {**describe(sub[sub.g == lv]["y"]),
                         "median": round4(sub[sub.g == lv]["y"].median())} for lv in levels},
         "h": round4(h), "df": k - 1, "p_value": float(p), "epsilon_squared": round4(eps2),
+        "posthoc_dunn": posthoc,
     }
     md = [
         "## Kruskal-Wallis H test\n",
@@ -324,6 +352,13 @@ def kruskal_wallis(df: pd.DataFrame, params: dict, fig_dir: str | Path | None = 
         + ("a statistically significant" if p < 0.05 else "no statistically significant")
         + f" difference, **H({k - 1}) = {round4(h)}**, {pstr(p)}, ε² = **{round4(eps2)}**.",
     ]
+    if posthoc:
+        md.append("\n**Dunn's post-hoc (Bonferroni-adjusted):**")
+        md.append("| Comparison | z | p (adj) | Significant |")
+        md.append("|---|---|---|---|")
+        for c in posthoc:
+            md.append(f"| {c['group1']} vs {c['group2']} | {c['z']} | "
+                      f"{fmt_p(c['p_bonferroni'])} | {'yes' if c['significant'] else 'no'} |")
     refs = citations.refs(["kruskal1952"])
     fig = None
     if fig_dir:

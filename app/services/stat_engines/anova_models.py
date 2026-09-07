@@ -70,6 +70,56 @@ def repeated_measures_anova(df: pd.DataFrame, params: dict, fig_dir: str | Path 
                             "Approximately normal residuals"]}
 
 
+def two_way_anova(df: pd.DataFrame, params: dict, fig_dir: str | Path | None = None) -> dict:
+    """Two-way (factorial) ANOVA: two factors and their interaction."""
+    import statsmodels.formula.api as smf
+    from statsmodels.stats.anova import anova_lm
+
+    outcome = params.get("outcome")
+    f1 = params.get("factor1") or params.get("group1")
+    f2 = params.get("factor2") or params.get("group2")
+    if not outcome or not f1 or not f2:
+        raise EngineError("Two-way ANOVA needs 'outcome', 'factor1', and 'factor2'.")
+    for c in (outcome, f1, f2):
+        get_col(df, c, "column")
+    data = df[[outcome, f1, f2]].copy()
+    data[outcome] = pd.to_numeric(data[outcome], errors="coerce")
+    data = data.dropna()
+    data = data.rename(columns={outcome: "_y", f1: "_a", f2: "_b"})
+    if data["_a"].nunique() < 2 or data["_b"].nunique() < 2:
+        raise EngineError("Each factor needs at least 2 levels.")
+    model = smf.ols("_y ~ C(_a) * C(_b)", data=data).fit()
+    table = anova_lm(model, typ=2)
+    resid_ss = table.loc["Residual", "sum_sq"]
+
+    def eff(term, label):
+        r = table.loc[term]
+        pe = float(r["sum_sq"] / (r["sum_sq"] + resid_ss))
+        return {"factor": label, "F": round4(r["F"]), "df": int(r["df"]),
+                "p_value": float(r["PR(>F)"]), "partial_eta_sq": round4(pe)}
+
+    effects = {"factor1": eff("C(_a)", f1), "factor2": eff("C(_b)", f2),
+               "interaction": eff("C(_a):C(_b)", f"{f1} × {f2}")}
+    values = {"n": int(len(data)), "outcome": outcome, "factor1": f1, "factor2": f2,
+              "effects": effects, "df_residual": int(table.loc["Residual", "df"])}
+    md = [
+        "## Two-way (factorial) ANOVA\n",
+        f"We examined effects of **{f1}** and **{f2}** (and their interaction) on "
+        f"**{outcome}** (n = {len(data)}).\n",
+    ]
+    for e in effects.values():
+        md.append(f"- **{e['factor']}**: F({e['df']}, {values['df_residual']}) = {e['F']}, "
+                  f"{pstr(e['p_value'])}, partial η² = {e['partial_eta_sq']}.")
+    md.append("\nA significant interaction means the effect of one factor depends on the level "
+              "of the other.")
+    refs = citations.refs(["fisher1925", "cohen1988"])
+    return {"key": "two_way_anova", "title": "Two-way ANOVA", "values": values,
+            "markdown": "\n".join(md) + refs_block(refs), "references": refs,
+            "figure_path": None,
+            "assumptions": ["Independent observations", "Approximately normal residuals",
+                            "Homogeneity of variance"]}
+
+
 def friedman(df: pd.DataFrame, params: dict, fig_dir: str | Path | None = None) -> dict:
     """Friedman test — non-parametric repeated measures (long format)."""
     subject = params.get("subject")
