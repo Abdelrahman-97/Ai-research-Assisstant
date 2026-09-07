@@ -645,6 +645,7 @@ const SS_FIELDS = {
 
 async function startTool(task) {
   try {
+    state.metaStudies = null;   // clear any parsed studies from a previous job
     const run = await api("/runs", { method: "POST", body: { task } });
     state.run = run; state.runId = run.id; state.view = "run"; render();
   } catch (e) { toast(e.message, true); }
@@ -708,8 +709,9 @@ function viewToolInput(task) {
   }
   // meta-analysis
   return `
-    <p class="sub">Pool results across studies. Choose your effect measure, paste your studies, and you'll get a full report: pooled effect (fixed + random), heterogeneity (I², τ²), subgroups, meta-regression, cumulative analysis, and publication-bias tests — all cited.</p>
-    <label>Effect measure</label>
+    <p class="sub">Pool results across studies. You'll get a full report: pooled effect (fixed + random), heterogeneity (I², τ²), subgroups, meta-regression, cumulative analysis, and publication-bias tests — with forest &amp; funnel plots, all cited.</p>
+
+    <label>1 · Effect measure <span class="muted-note">— what each study reports</span></label>
     <select id="mMeasure">
       <option value="generic">Generic (effect + standard error)</option>
       <option value="or">Odds ratio (from 2×2 counts)</option>
@@ -723,8 +725,42 @@ function viewToolInput(task) {
       <option value="hr">Hazard ratio (log-HR + SE)</option>
     </select>
     <div id="mHelp" class="muted-note" style="margin-top:6px;"></div>
-    <label>Studies — one per line</label>
-    <textarea id="mData" rows="7" placeholder=""></textarea>
+
+    <label style="margin-top:14px;">2 · Optional columns you also want to use</label>
+    <label class="agree"><input type="checkbox" id="mSub" /> <span><strong>Subgroups</strong> — adds a <em>group</em> column + tests differences between subgroups</span></label>
+    <label class="agree"><input type="checkbox" id="mReg" /> <span><strong>Meta-regression</strong> — adds a numeric <em>moderator</em> column</span></label>
+    <label class="agree"><input type="checkbox" id="mCum" /> <span><strong>Cumulative</strong> — adds a <em>year</em> column (studies pooled in time order)</span></label>
+
+    <label style="margin-top:14px;">3 · How do you want to enter your studies?</label>
+    <select id="mMode">
+      <option value="upload">Upload a spreadsheet (Excel/CSV) — recommended</option>
+      <option value="guided">Enter studies one by one (guided form)</option>
+      <option value="paste">Paste a table (advanced)</option>
+    </select>
+
+    <div id="metaUpload" style="margin-top:10px;">
+      <p class="muted-note">Download the template — it has the exact column headers for your chosen measure. Fill one study per row in Excel, then upload it. We check it and show you a preview before you pay.</p>
+      <div class="btn-row">
+        <button id="mTemplateBtn" type="button" class="btn btn-ghost">⬇ Download template (.csv)</button>
+      </div>
+      <input id="mFile" type="file" accept=".xlsx,.xls,.csv,.tsv" style="margin-top:8px;" />
+      <div class="btn-row"><button id="mParseBtn" type="button" class="btn btn-primary">Check my file</button></div>
+      <div id="mParseResult"></div>
+    </div>
+
+    <div id="metaGuided" class="hidden" style="margin-top:10px;">
+      <p class="muted-note">Fill in one study at a time. Add a row for each study (minimum 2).</p>
+      <div id="mRows"></div>
+      <div class="btn-row"><button id="mAddRow" type="button" class="btn btn-ghost">+ Add study</button></div>
+    </div>
+
+    <div id="metaPaste" class="hidden" style="margin-top:10px;">
+      <label>Studies — one per line, comma-separated</label>
+      <textarea id="mData" rows="7" placeholder=""></textarea>
+      <div id="mPasteHelp" class="muted-note"></div>
+    </div>
+
+    <label style="margin-top:14px;">4 · Analysis options</label>
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;">
       <div style="flex:1;min-width:150px;"><label>Model</label>
         <select id="mModel"><option value="random">Random effects</option><option value="fixed">Fixed effect</option></select></div>
@@ -732,11 +768,38 @@ function viewToolInput(task) {
         <select id="mTau"><option value="DL">DerSimonian-Laird</option><option value="PM">Paule-Mandel</option><option value="REML">REML</option></select></div>
     </div>
     <label class="agree"><input type="checkbox" id="mHksj" /> <span>Use Hartung-Knapp adjustment (more conservative CIs; good for few studies)</span></label>
-    <label class="agree"><input type="checkbox" id="mSub" checked /> <span>Subgroup analysis (needs a <strong>group</strong> column) + test for differences</span></label>
-    <label class="agree"><input type="checkbox" id="mReg" /> <span>Meta-regression (needs a numeric <strong>moderator</strong> column)</span></label>
-    <label class="agree"><input type="checkbox" id="mCum" /> <span>Cumulative analysis (needs a <strong>year</strong> column)</span></label>
-    <p class="muted-note">Optional trailing columns, in this order: <strong>group, moderator, year</strong>. Add only the ones you need — e.g. for subgroups add a group column; for meta-regression add group (or leave blank) then a moderator number.</p>
+
     <div class="btn-row"><button id="toolEstimateBtn" class="btn btn-primary">Continue to price</button></div>`;
+}
+
+/* Per-measure column schema — single source of truth for the template,
+ * the guided form, and the paste guide. Each field: [key, header, label, example]. */
+const MEASURE_SCHEMA = {
+  generic:    [["name","name","Study","Smith 2019"],["effect","effect","Effect size","0.20"],["se","standard_error","Standard error","0.10"]],
+  hr:         [["name","name","Study","Smith 2019"],["effect","logHR","log Hazard ratio","-0.36"],["se","standard_error","Standard error","0.14"]],
+  or:         [["name","name","Study","Smith 2019"],["e1","events1","Events (grp 1)","20"],["n1","n1","N (grp 1)","100"],["e2","events2","Events (grp 2)","30"],["n2","n2","N (grp 2)","100"]],
+  md:         [["name","name","Study","Smith 2019"],["n1","n1","N (grp 1)","40"],["m1","mean1","Mean (grp 1)","5.2"],["sd1","sd1","SD (grp 1)","1.1"],["n2","n2","N (grp 2)","40"],["m2","mean2","Mean (grp 2)","4.6"],["sd2","sd2","SD (grp 2)","1.2"]],
+  fisher_z:   [["name","name","Study","Smith 2019"],["r","r","Correlation r","0.30"],["n","n","Sample size","50"]],
+  proportion: [["name","name","Study","Smith 2019"],["events","events","Events","25"],["total","total","Total","100"]],
+};
+MEASURE_SCHEMA.rr = MEASURE_SCHEMA.rd = MEASURE_SCHEMA.peto = MEASURE_SCHEMA.or;
+MEASURE_SCHEMA.smd = MEASURE_SCHEMA.md;
+
+/* Which optional columns are switched on (key, header, label, type). */
+function metaOptionalCols() {
+  const out = [];
+  if (document.getElementById("mSub")?.checked)  out.push(["group","group","Subgroup","text"]);
+  if (document.getElementById("mReg")?.checked)  out.push(["moderator","moderator","Moderator (number)","num"]);
+  if (document.getElementById("mCum")?.checked)  out.push(["year","year","Year","num"]);
+  return out;
+}
+/* Combined field list for the current measure + optional columns. */
+function metaFields() {
+  const measure = document.getElementById("mMeasure").value;
+  const base = (MEASURE_SCHEMA[measure] || MEASURE_SCHEMA.generic)
+    .map(([k, h, label, ex]) => [k, h, label, ex, k === "name" ? "text" : "num"]);
+  const opt = metaOptionalCols().map(([k, h, label, type]) => [k, h, label, "", type]);
+  return base.concat(opt);
 }
 
 const _OPT = " [, group, moderator, year]";
@@ -778,26 +841,21 @@ function gatherToolInputs(task) {
              fn: parseInt(document.getElementById("dFN").value, 10),
              tn: parseInt(document.getElementById("dTN").value, 10) };
   }
-  // meta
+  // meta — studies come from one of three input modes
   const measure = document.getElementById("mMeasure").value;
-  const CORE = { generic: 3, hr: 3, or: 5, rr: 5, rd: 5, peto: 5, md: 7, smd: 7, fisher_z: 3, proportion: 3 };
-  const core = CORE[measure] || 3;
-  const lines = document.getElementById("mData").value.split("\n").map(l => l.trim()).filter(Boolean);
-  const studies = lines.map(line => {
-    const p = line.split(",").map(s => s.trim());
-    const o = { name: p[0] };
-    if (measure === "generic" || measure === "hr") { o.effect = _num(p[1]); o.se = _num(p[2]); }
-    else if (["or", "rr", "rd", "peto"].includes(measure)) { o.e1 = _num(p[1]); o.n1 = _num(p[2]); o.e2 = _num(p[3]); o.n2 = _num(p[4]); }
-    else if (["md", "smd"].includes(measure)) { o.n1 = _num(p[1]); o.m1 = _num(p[2]); o.sd1 = _num(p[3]); o.n2 = _num(p[4]); o.m2 = _num(p[5]); o.sd2 = _num(p[6]); }
-    else if (measure === "fisher_z") { o.r = _num(p[1]); o.n = _num(p[2]); }
-    else if (measure === "proportion") { o.events = _num(p[1]); o.total = _num(p[2]); }
-    // optional trailing columns, in order: group, moderator, year
-    const extra = p.slice(core);
-    if (extra[0]) o.group = extra[0];
-    if (extra[1] !== undefined && extra[1] !== "") o.moderator = _num(extra[1]);
-    if (extra[2] !== undefined && extra[2] !== "") o.year = _num(extra[2]);
-    return o;
-  });
+  const mode = document.getElementById("mMode").value;
+  let studies;
+  if (mode === "upload") {
+    studies = state.metaStudies || [];
+    if (studies.length < 2)
+      throw new Error("Upload your file and click “Check my file” first (need at least 2 valid studies).");
+  } else if (mode === "guided") {
+    studies = gatherGuidedStudies();
+    if (studies.length < 2) throw new Error("Add at least 2 studies (fill in the rows).");
+  } else {
+    studies = parsePastedStudies(measure);
+    if (studies.length < 2) throw new Error("Enter at least 2 studies, one per line.");
+  }
   return { studies, measure, model: document.getElementById("mModel").value,
            tau2_method: document.getElementById("mTau").value,
            hksj: document.getElementById("mHksj").checked,
@@ -805,6 +863,103 @@ function gatherToolInputs(task) {
            meta_regression: document.getElementById("mReg").checked,
            cumulative: document.getElementById("mCum").checked,
            bias_tests: true };
+}
+
+/* Parse the advanced paste box into studies, using the current field layout. */
+function parsePastedStudies(measure) {
+  const fields = metaFields();  // [key, header, label, ex, type] incl. optional cols
+  const lines = document.getElementById("mData").value.split("\n").map(l => l.trim()).filter(Boolean);
+  return lines.map(line => {
+    const p = line.split(",").map(s => s.trim());
+    const o = {};
+    fields.forEach(([k, , , , type], i) => {
+      const v = p[i];
+      if (v === undefined || v === "") return;
+      o[k] = (type === "num") ? _num(v) : v;
+    });
+    if (!o.name) o.name = p[0] || "Study";
+    return o;
+  });
+}
+
+/* Read the guided per-study rows into a studies array. */
+function gatherGuidedStudies() {
+  const rows = [...document.querySelectorAll("#mRows .mgrow")];
+  const studies = [];
+  rows.forEach(row => {
+    const o = {};
+    let hasData = false;
+    row.querySelectorAll(".mg").forEach(inp => {
+      const k = inp.dataset.k, v = inp.value.trim();
+      if (v === "") return;
+      o[k] = (inp.dataset.type === "num") ? _num(v) : v;
+      if (k !== "name") hasData = true;
+    });
+    if (hasData) { if (!o.name) o.name = "Study " + (studies.length + 1); studies.push(o); }
+  });
+  return studies;
+}
+
+/* Build the dynamic paste-guide / column list for the current layout. */
+function metaPasteGuide() {
+  const cols = metaFields().map(f => f[1]).join(", ");
+  const ex = metaFields().map(f => f[3]).filter(Boolean).join(", ");
+  return `Columns in this order: <strong>${esc(cols)}</strong>.` + (ex ? ` Example: ${esc(ex)}` : "");
+}
+
+/* One guided-form row of inputs for the current field layout. */
+function metaGuidedRow() {
+  const inputs = metaFields().map(([k, , label, ex, type]) =>
+    `<div style="flex:1;min-width:88px;">
+       <label style="font-size:12px;margin:0;">${esc(label)}</label>
+       <input class="mg" data-k="${k}" data-type="${type}" type="${type === "num" ? "number" : "text"}"
+              step="any" placeholder="${esc(ex || "")}" /></div>`).join("");
+  return `<div class="mgrow" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;border-bottom:1px solid var(--line);padding:8px 0;">
+      ${inputs}
+      <button class="btn btn-ghost mgdel" type="button" title="Remove this study" style="padding:6px 10px;">✕</button>
+    </div>`;
+}
+
+/* Download a CSV template with the correct headers for the current layout. */
+function downloadMetaTemplate() {
+  const measure = document.getElementById("mMeasure").value;
+  const header = metaFields().map(f => f[1]).join(",");
+  const example = metaFields().map(f => f[3]).join(",");   // one example row to show the shape
+  const csv = header + "\n" + example + "\n";
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `meta-template-${measure}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(a.href);
+}
+
+/* Render the parse/validation result after an upload. */
+function renderMetaParse(res) {
+  const mapped = Object.entries(res.mapped_columns || {})
+    .map(([k, col]) => `${esc(k)} ← “${esc(col)}”`).join(" · ");
+  let html = `<div class="card" style="margin-top:10px;background:var(--panel);">
+    <p><span class="pill ok">✓ ${res.n_valid} valid stud${res.n_valid === 1 ? "y" : "ies"}</span>
+       <span class="muted-note"> of ${res.n_rows} row(s)</span></p>
+    <p class="muted-note">Matched columns: ${mapped || "—"}</p>`;
+  (res.warnings || []).forEach(w => { html += `<p class="muted-note" style="color:var(--warn,#b45309);">${esc(w)}</p>`; });
+  if ((res.invalid || []).length) {
+    html += `<p class="muted-note"><strong>Skipped rows:</strong></p><ul class="muted-note" style="margin:4px 0 0 16px;">`;
+    res.invalid.slice(0, 20).forEach(iv =>
+      html += `<li>Row ${iv.row} (${esc(iv.name)}): ${esc(iv.reason)}</li>`);
+    html += `</ul>`;
+  }
+  // small preview of the first few parsed studies
+  const prev = (res.studies || []).slice(0, 5);
+  if (prev.length) {
+    const keys = Object.keys(prev[0]);
+    html += `<div style="overflow:auto;margin-top:8px;"><table class="prev"><thead><tr>` +
+      keys.map(k => `<th>${esc(k)}</th>`).join("") + `</tr></thead><tbody>` +
+      prev.map(s => `<tr>` + keys.map(k => `<td>${esc(s[k] ?? "")}</td>`).join("") + `</tr>`).join("") +
+      `</tbody></table></div>`;
+  }
+  html += `<p class="muted-note" style="margin-top:8px;">Looks right? Click <strong>Continue to price</strong> below.</p></div>`;
+  return html;
 }
 
 function renderToolRun() {
@@ -856,11 +1011,7 @@ function bindToolHandlers() {
     };
     dMode.onchange = t; t();
   }
-  const mMeasure = document.getElementById("mMeasure");
-  if (mMeasure) {
-    const help = () => { document.getElementById("mHelp").textContent = META_HELP[mMeasure.value] || ""; };
-    mMeasure.onchange = help; help();
-  }
+  if (document.getElementById("mMeasure")) bindMetaHandlers();
   const est = document.getElementById("toolEstimateBtn");
   if (est) est.onclick = () => step("toolEstimateBtn", async () => {
     const inputs = gatherToolInputs(r.task);
@@ -869,6 +1020,68 @@ function bindToolHandlers() {
   });
   const retry = document.getElementById("toolRetry");
   if (retry) retry.onclick = () => { state.run = { ...state.run, status: "created" }; render(); };
+}
+
+function bindMetaHandlers() {
+  const r = state.run;
+  const measureEl = document.getElementById("mMeasure");
+  const modeEl = document.getElementById("mMode");
+  const desc = () => { document.getElementById("mHelp").textContent = META_HELP[measureEl.value] || ""; };
+  const guide = () => {
+    const el = document.getElementById("mPasteHelp");
+    if (el) el.innerHTML = metaPasteGuide();
+  };
+  const drawGuided = () => {
+    const box = document.getElementById("mRows");
+    if (!box) return;
+    if (!box.children.length) box.innerHTML = metaGuidedRow() + metaGuidedRow();  // start with 2
+    else box.innerHTML = [...box.children].map(() => metaGuidedRow()).join("");    // relayout, keep count
+  };
+  const showMode = () => {
+    const m = modeEl.value;
+    document.getElementById("metaUpload").classList.toggle("hidden", m !== "upload");
+    document.getElementById("metaGuided").classList.toggle("hidden", m !== "guided");
+    document.getElementById("metaPaste").classList.toggle("hidden", m !== "paste");
+    if (m === "guided") drawGuided();
+    if (m === "paste") guide();
+  };
+  // Changing the measure or optional columns invalidates a prior upload + relayouts.
+  const relayout = () => {
+    state.metaStudies = null;
+    const pr = document.getElementById("mParseResult"); if (pr) pr.innerHTML = "";
+    desc(); guide();
+    if (modeEl.value === "guided") drawGuided();
+  };
+  measureEl.onchange = relayout;
+  ["mSub", "mReg", "mCum"].forEach(id => {
+    const el = document.getElementById(id); if (el) el.onchange = relayout;
+  });
+  modeEl.onchange = showMode;
+
+  const tpl = document.getElementById("mTemplateBtn");
+  if (tpl) tpl.onclick = downloadMetaTemplate;
+
+  const addRow = document.getElementById("mAddRow");
+  if (addRow) addRow.onclick = () => document.getElementById("mRows").insertAdjacentHTML("beforeend", metaGuidedRow());
+  const rowsBox = document.getElementById("mRows");
+  if (rowsBox) rowsBox.onclick = (e) => {
+    const del = e.target.closest(".mgdel");
+    if (del) del.closest(".mgrow").remove();
+  };
+
+  const parseBtn = document.getElementById("mParseBtn");
+  if (parseBtn) parseBtn.onclick = () => step("mParseBtn", async () => {
+    const file = document.getElementById("mFile").files[0];
+    if (!file) throw new Error("Choose a file to check first.");
+    const fd = new FormData();
+    fd.append("measure", measureEl.value);
+    fd.append("data_file", file);
+    const res = await api(`/runs/${r.id}/meta-parse`, { method: "POST", form: fd });
+    state.metaStudies = res.studies;
+    document.getElementById("mParseResult").innerHTML = renderMetaParse(res);
+  });
+
+  desc(); showMode();
 }
 
 async function step2Compute() {

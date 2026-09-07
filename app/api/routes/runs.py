@@ -33,7 +33,8 @@ from app.models.schemas import (
     User,
 )
 from app.services import (
-    assistant, cleanup, formatting, orchestrator, payments, preview, report_writer,
+    assistant, cleanup, formatting, meta_ingest, orchestrator, payments, preview,
+    report_writer,
 )
 from app.services.llm_client import LLMError
 from app.services.orchestrator import PipelineError
@@ -329,6 +330,64 @@ def tool_estimate(run_id: str, body: ToolEstimateRequest,
     """Price a tool job (meta-analysis / sample-size / diagnostic) + store inputs."""
     run = _get_owned_run(run_id, user)
     return _guard(lambda: orchestrator.estimate_tool(run, body.inputs))
+
+
+@router.post("/{run_id}/meta-parse")
+async def meta_parse(
+    run_id: str,
+    measure: str = Form("generic"),
+    data_file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Parse an uploaded study spreadsheet into meta-analysis studies + validation.
+
+    Returns the parsed studies (valid rows), a per-row list of any skipped rows
+    with reasons, and which spreadsheet columns were matched — shown to the user
+    as a preview *before* they pay. Does not change the run.
+    """
+    _get_owned_run(run_id, user)  # ownership check
+    suffix = Path(data_file.filename or "").suffix.lower()
+    if suffix not in _ALLOWED_SUFFIXES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Upload a .xlsx, .xls, .csv or .tsv file.",
+        )
+    import tempfile
+    tmp = Path(tempfile.mkdtemp()) / f"studies{suffix}"
+    tmp.write_bytes(await _read_capped(data_file))
+    try:
+        return meta_ingest.parse(tmp, measure)
+    except meta_ingest.MetaIngestError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail=str(exc)) from exc
+    finally:
+        shutil.rmtree(tmp.parent, ignore_errors=True)
+
+
+@router.get("/meta-template")
+def meta_template(
+    measure: str = Query("generic"),
+    group: bool = Query(False),
+    moderator: bool = Query(False),
+    year: bool = Query(False),
+    user: User = Depends(get_current_user),
+):
+    """Download a CSV template with the correct headers for a given effect measure."""
+    import csv
+    import io
+
+    cols = meta_ingest.template_columns(
+        measure, group=group, moderator=moderator, year=year
+    )
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(cols)
+    buf.write("")  # header only; the user fills the rows
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="meta-template-{measure}.csv"'},
+    )
 
 
 @router.post("/{run_id}/tool-compute", response_model=Run)

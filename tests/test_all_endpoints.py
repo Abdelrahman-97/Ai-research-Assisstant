@@ -132,6 +132,14 @@ def test_every_endpoint(tmp_path):
     assert tc.status_code == 200 and tc.json()["status"] == "completed", tc.text
     hit.add("/runs/{run_id}/tool-compute")
 
+    # meta-analysis spreadsheet ingestion (parse + template) — full tests in test_meta_ingest.py
+    mr = client.post("/runs", headers=auth, json={"task": "meta_analysis", "scope": "studies"}).json()["id"]
+    mp = client.post(f"/runs/{mr}/meta-parse", headers=auth, data={"measure": "generic"},
+                     files={"data_file": ("s.csv", "name,effect,standard_error\nA,0.2,0.1\nB,0.3,0.15\n", "text/csv")})
+    assert mp.status_code == 200 and mp.json()["n_valid"] == 2; hit.add("/runs/{run_id}/meta-parse")
+    assert client.get("/runs/meta-template", headers=auth, params={"measure": "or"}).status_code == 200
+    hit.add("/runs/meta-template")
+
     # account deletion + admin (full flows in test_hardening.py) — hit for coverage
     client.delete("/auth/me", headers=auth); hit.add("/auth/me")
     for p in ("/admin/stats", "/admin/runs"):
