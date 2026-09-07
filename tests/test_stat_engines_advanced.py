@@ -36,8 +36,47 @@ def _png(p):
         return f.read(8) == b"\x89PNG\r\n\x1a\n"
 
 
-def test_registry_has_18_engines():
-    assert len(catalogue()) >= 18
+def test_registry_has_all_engines():
+    assert len(catalogue()) >= 21
+
+
+def test_anova_posthoc_and_normality():
+    rng = np.random.default_rng(11)
+    g = np.array(["A", "B", "C"] * 20)
+    d = pd.DataFrame({"g": g, "y": np.select([g == "A", g == "B", g == "C"], [10, 12, 15])
+                      + rng.normal(0, 2, 60)})
+    r = run_engine("one_way_anova", d, {"outcome": "y", "group": "g"})
+    assert len(r["values"]["posthoc_tukey"]) == 3        # 3 pairwise comparisons
+    assert len(r["values"]["normality"]) == 3            # Shapiro per group
+    assert all("p_value" in c for c in r["values"]["posthoc_tukey"])
+
+
+def test_friedman():
+    rng = np.random.default_rng(5)
+    long = pd.DataFrame({
+        "subj": list(range(15)) * 3,
+        "cond": ["t1"] * 15 + ["t2"] * 15 + ["t3"] * 15,
+        "val": np.r_[rng.normal(5, 1, 15), rng.normal(6, 1, 15), rng.normal(8, 1, 15)],
+    })
+    r = run_engine("friedman", long, {"subject": "subj", "within": "cond", "outcome": "val"})
+    assert r["values"]["df"] == 2 and r["values"]["kendalls_w"] is not None
+
+
+def test_fishers_exact():
+    d = pd.DataFrame({"exposure": ["y"] * 10 + ["n"] * 10,
+                      "disease": ["y"] * 3 + ["n"] * 7 + ["y"] * 8 + ["n"] * 2})
+    r = run_engine("fishers_exact", d, {"var1": "exposure", "var2": "disease"})
+    assert r["values"]["odds_ratio"] is not None and r["values"]["n"] == 20
+    with pytest.raises(EngineError):    # not 2x2
+        big = pd.DataFrame({"a": ["x", "y", "z"] * 5, "b": ["p", "q"] * 7 + ["p"]})
+        run_engine("fishers_exact", big, {"var1": "a", "var2": "b"})
+
+
+def test_mcnemar():
+    d = pd.DataFrame({"before": ["pos"] * 8 + ["neg"] * 12,
+                      "after": ["pos"] * 5 + ["neg"] * 3 + ["pos"] * 7 + ["neg"] * 5})
+    r = run_engine("mcnemar", d, {"var1": "before", "var2": "after"})
+    assert r["values"]["p_value"] is not None
 
 
 def test_logistic_regression(df):

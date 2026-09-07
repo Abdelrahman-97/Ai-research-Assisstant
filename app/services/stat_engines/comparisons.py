@@ -58,6 +58,7 @@ def independent_ttest(df: pd.DataFrame, params: dict, fig_dir: str | Path | None
     lev_stat, lev_p = stats.levene(a, b, center="median")
     equal_var = bool(lev_p >= 0.05)
     t, p = stats.ttest_ind(a, b, equal_var=equal_var)
+    norm, norm_note = _shapiro_note([a, b], [levels[0], levels[1]])
 
     sp = math.sqrt(((n1 - 1) * s1 ** 2 + (n2 - 1) * s2 ** 2) / (n1 + n2 - 2))
     d = (m1 - m2) / sp if sp else None
@@ -78,7 +79,7 @@ def independent_ttest(df: pd.DataFrame, params: dict, fig_dir: str | Path | None
         "t": round4(t), "df": round4(dfree), "p_value": float(p),
         "cohens_d": round4(d), "equal_variances": equal_var,
         "levene": {"statistic": round4(lev_stat), "p_value": float(lev_p)},
-        "method": method,
+        "normality": norm, "method": method,
     }
     md = [
         f"## Independent-samples t-test\n",
@@ -93,8 +94,10 @@ def independent_ttest(df: pd.DataFrame, params: dict, fig_dir: str | Path | None
         f"Cohen's d = **{round4(d)}** "
         f"({_d_word(d)} effect).",
     ]
+    if norm_note:
+        md.append("\n" + norm_note)
     refs = citations.refs(["student1908"] + ([] if equal_var else ["welch1947"])
-                          + ["levene1960", "cohen1988"])
+                          + ["levene1960", "shapiro1965", "cohen1988"])
     fig = None
     if fig_dir:
         fig = plots.box_by_group({levels[0]: a.tolist(), levels[1]: b.tolist()},
@@ -166,11 +169,28 @@ def one_way_anova(df: pd.DataFrame, params: dict, fig_dir: str | Path | None = N
     df_between = len(levels) - 1
     df_within = len(sub) - len(levels)
     lev_stat, lev_p = stats.levene(*arrays, center="median")
+    norm, norm_note = _shapiro_note(arrays, levels)
+
+    # Tukey HSD post-hoc for pairwise comparisons (esp. when the omnibus is significant).
+    posthoc = []
+    if len(levels) > 2:
+        try:
+            from statsmodels.stats.multicomp import pairwise_tukeyhsd
+            tuk = pairwise_tukeyhsd(sub["y"].values, sub["g"].values)
+            for row in tuk.summary().data[1:]:
+                posthoc.append({"group1": str(row[0]), "group2": str(row[1]),
+                                "mean_diff": round4(row[2]), "p_value": float(row[3]),
+                                "ci_low": round4(row[4]), "ci_high": round4(row[5]),
+                                "reject": bool(row[6])})
+        except Exception:  # noqa: BLE001 - post-hoc is a bonus, never fatal
+            posthoc = []
+
     values = {
         "groups": {lv: describe(sub[sub.g == lv]["y"]) for lv in levels},
         "f": round4(f), "df_between": df_between, "df_within": df_within,
         "p_value": float(p), "eta_squared": round4(eta2),
         "levene": {"statistic": round4(lev_stat), "p_value": float(lev_p)},
+        "normality": norm, "posthoc_tukey": posthoc,
     }
     md = [
         "## One-way ANOVA\n",
@@ -183,7 +203,18 @@ def one_way_anova(df: pd.DataFrame, params: dict, fig_dir: str | Path | None = N
         f"\nLevene's test: F = {round4(lev_stat)}, {pstr(lev_p)}"
         + (" (variances similar)." if lev_p >= 0.05 else " (variances differ; consider Welch's ANOVA)."),
     ]
-    refs = citations.refs(["fisher1925", "levene1960", "cohen1988"])
+    if norm_note:
+        md.append("\n" + norm_note)
+    if posthoc:
+        md.append("\n**Tukey HSD post-hoc (pairwise):**")
+        md.append("| Comparison | Mean diff | 95% CI | p (adj) | Significant |")
+        md.append("|---|---|---|---|---|")
+        for c in posthoc:
+            md.append(f"| {c['group1']} vs {c['group2']} | {c['mean_diff']} | "
+                      f"{c['ci_low']} to {c['ci_high']} | {fmt_p(c['p_value'])} | "
+                      f"{'yes' if c['reject'] else 'no'} |")
+    refs = citations.refs(["fisher1925", "levene1960", "shapiro1965", "cohen1988"]
+                          + (["tukey1949"] if posthoc else []))
     fig = None
     if fig_dir:
         fig = plots.box_by_group({lv: sub[sub.g == lv]["y"].tolist() for lv in levels},
@@ -309,3 +340,26 @@ def _d_word(d):
         return "—"
     a = abs(d)
     return "small" if a < 0.5 else "medium" if a < 0.8 else "large"
+
+
+def _shapiro_note(arrays, labels) -> tuple[dict, str]:
+    """Shapiro-Wilk normality per group. Returns (values, a plain-language note)."""
+    results = {}
+    worst = None
+    for arr, lab in zip(arrays, labels):
+        a = np.asarray(arr, dtype=float)
+        if 3 <= len(a) <= 5000:
+            try:
+                w, p = stats.shapiro(a)
+                results[str(lab)] = {"W": round(float(w), 4), "p_value": float(p)}
+                worst = p if worst is None else min(worst, p)
+            except Exception:  # noqa: BLE001
+                continue
+    if worst is None:
+        return results, ""
+    if worst < 0.05:
+        note = ("Shapiro-Wilk indicated the outcome departed from normality in at least one "
+                "group (p < .05); a non-parametric alternative may be more appropriate.")
+    else:
+        note = "Shapiro-Wilk found no significant departure from normality (all p ≥ .05)."
+    return results, note

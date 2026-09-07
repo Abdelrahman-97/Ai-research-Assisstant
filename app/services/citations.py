@@ -63,6 +63,9 @@ _REFS: dict[str, str] = {
     "cohen1960": "Cohen, J. (1960). A coefficient of agreement for nominal scales. Educational and Psychological Measurement, 20(1), 37–46.",
     "shrout1979": "Shrout, P. E., & Fleiss, J. L. (1979). Intraclass correlations: uses in assessing rater reliability. Psychological Bulletin, 86(2), 420–428.",
     "bland1986": "Bland, J. M., & Altman, D. G. (1986). Statistical methods for assessing agreement between two methods of clinical measurement. The Lancet, 327(8476), 307–310.",
+    "friedman1937": "Friedman, M. (1937). The use of ranks to avoid the assumption of normality implicit in the analysis of variance. Journal of the American Statistical Association, 32(200), 675–701.",
+    "fisher1922": "Fisher, R. A. (1922). On the interpretation of χ² from contingency tables, and the calculation of P. Journal of the Royal Statistical Society, 85(1), 87–94.",
+    "mcnemar1947": "McNemar, Q. (1947). Note on the sampling error of the difference between correlated proportions or percentages. Psychometrika, 12(2), 153–157.",
 
     # --- Diagnostic accuracy ---
     "altman1994": "Altman, D. G., & Bland, J. M. (1994). Diagnostic tests 1: sensitivity and specificity. BMJ, 308(6943), 1552.",

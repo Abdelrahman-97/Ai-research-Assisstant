@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.services.stat_engines import (
-    agreement, anova_models, associations, comparisons, descriptives,
+    agreement, anova_models, associations, categorical, comparisons, descriptives,
     regression_models, survival,
 )
 from app.services.stat_engines.base import EngineError
@@ -135,6 +135,28 @@ REGISTRY: dict[str, dict] = {
         "fn": agreement.bland_altman,
         "params": {"method1": "numeric column (method A)", "method2": "numeric column (method B)"},
         "when": "Agreement between TWO measurement methods (bias + limits of agreement).",
+    },
+    "friedman": {
+        "title": "Friedman test",
+        "fn": anova_models.friedman,
+        "params": {"subject": "subject id column", "within": "condition/time column",
+                   "outcome": "numeric column"},
+        "when": "Non-parametric alternative to repeated-measures ANOVA (3+ conditions on the "
+                "same subjects; long format).",
+    },
+    "fishers_exact": {
+        "title": "Fisher's exact test",
+        "fn": categorical.fishers_exact,
+        "params": {"var1": "binary categorical column", "var2": "binary categorical column"},
+        "when": "Association between two binary variables in a 2×2 table with a SMALL sample "
+                "(preferred over chi-square when expected counts are low).",
+    },
+    "mcnemar": {
+        "title": "McNemar's test",
+        "fn": categorical.mcnemar,
+        "params": {"var1": "binary before column", "var2": "binary after column"},
+        "when": "Paired binary data — change in a yes/no outcome measured twice on the same "
+                "subjects (e.g. before vs after).",
     },
 }
 
