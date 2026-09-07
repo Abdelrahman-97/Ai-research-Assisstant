@@ -23,8 +23,31 @@ def df():
     })
 
 
-def test_registry_28():
-    assert len(catalogue()) >= 28
+def test_registry_30():
+    assert len(catalogue()) >= 30
+
+
+def test_manova():
+    rng = np.random.default_rng(8)
+    g = np.array(["A", "B", "C"] * 30)
+    d = pd.DataFrame({"g": g, "y1": rng.normal(0, 1, 90) + (g == "B"),
+                      "y2": rng.normal(0, 1, 90) + (g == "C")})
+    r = run_engine("manova", d, {"outcomes": ["y1", "y2"], "group": "g"})
+    assert r["values"]["wilks_lambda"]["p_value"] is not None
+    with pytest.raises(EngineError):     # needs 2+ outcomes
+        run_engine("manova", d, {"outcomes": ["y1"], "group": "g"})
+
+
+def test_mixed_effects():
+    rng = np.random.default_rng(9)
+    subj = np.repeat(np.arange(30), 3)
+    time = np.tile([0, 1, 2], 30)
+    val = time * 0.5 + np.repeat(rng.normal(0, 1, 30), 3) + rng.normal(0, 0.5, 90)
+    d = pd.DataFrame({"subj": subj, "time": time, "val": val})
+    r = run_engine("mixed_effects", d, {"outcome": "val", "predictors": ["time"], "group": "subj"})
+    v = r["values"]
+    assert v["n_groups"] == 30 and v["group_variance"] is not None
+    assert any(c["term"] == "time" for c in v["fixed_effects"])
 
 
 def test_one_sample_ttest(df):

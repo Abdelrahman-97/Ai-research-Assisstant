@@ -47,6 +47,51 @@ function toast(msg, isErr = false) {
 }
 function esc(s) { return String(s ?? "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
 
+/* Minimal, safe Markdown -> HTML for the Results view (headings, tables, lists,
+ * bold/italic/code). Input is escaped first, so only tags we generate appear. */
+function mdInline(s) {
+  return s
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+function mdToHtml(src) {
+  const lines = String(src || "").split("\n");
+  let html = "", para = [], i = 0;
+  const flush = () => { if (para.length) { html += "<p>" + mdInline(esc(para.join(" "))) + "</p>"; para = []; } };
+  const rowCells = l => l.trim().replace(/^\||\|$/g, "").split("|").map(c => c.trim());
+  while (i < lines.length) {
+    const line = lines[i];
+    if (/^\s*\|/.test(line) && i + 1 < lines.length && /^\s*\|?[\s:|-]*-[\s:|-]*$/.test(lines[i + 1])) {
+      flush();
+      const header = rowCells(line); i += 2;
+      const body = [];
+      while (i < lines.length && /^\s*\|/.test(lines[i])) { body.push(rowCells(lines[i])); i++; }
+      html += '<table class="md-table"><thead><tr>' + header.map(h => "<th>" + mdInline(esc(h)) + "</th>").join("") +
+        "</tr></thead><tbody>" + body.map(r => "<tr>" + r.map(c => "<td>" + mdInline(esc(c)) + "</td>").join("") + "</tr>").join("") +
+        "</tbody></table>";
+      continue;
+    }
+    const h = line.match(/^(#{1,4})\s+(.*)$/);
+    if (h) { flush(); const n = h[1].length; html += `<h${n}>` + mdInline(esc(h[2])) + `</h${n}>`; i++; continue; }
+    if (/^\s*[-*]\s+/.test(line)) {
+      flush(); const items = [];
+      while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) { items.push(lines[i].replace(/^\s*[-*]\s+/, "")); i++; }
+      html += "<ul>" + items.map(it => "<li>" + mdInline(esc(it)) + "</li>").join("") + "</ul>"; continue;
+    }
+    if (/^\s*\d+\.\s+/.test(line)) {
+      flush(); const items = [];
+      while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) { items.push(lines[i].replace(/^\s*\d+\.\s+/, "")); i++; }
+      html += "<ol>" + items.map(it => "<li>" + mdInline(esc(it)) + "</li>").join("") + "</ol>"; continue;
+    }
+    if (/^\s*---\s*$/.test(line)) { flush(); html += "<hr>"; i++; continue; }
+    if (line.trim() === "") { flush(); i++; continue; }
+    para.push(line.trim()); i++;
+  }
+  flush();
+  return html;
+}
+
 function syncTopbar() {
   document.getElementById("userEmail").textContent = state.user ? (state.user.name || state.user.email) : "";
   document.getElementById("logoutBtn").classList.toggle("hidden", !state.user);
@@ -661,7 +706,7 @@ function viewResults() {
   const expiry = r.expires_at ? new Date(r.expires_at).toLocaleDateString() : null;
   return `
     <h2>Your Results section ${accepted ? '<span class="pill ok">accepted</span>' : '<span class="pill ok">ready</span>'}</h2>
-    <div class="md">${esc(r.results_markdown || "")}</div>
+    <div class="md">${mdToHtml(r.results_markdown || "")}</div>
     ${accepted ? `<p class="muted-note">Files available until ${expiry}.</p>`
       : `<p class="sub" style="margin-top:16px;">Happy with it? Accept to finalise (starts the 30-day storage window).</p>
          <p class="muted-note">💡 Want changes first? Use "Your analyst" chat below to refine wording, re-run, or add analyses before you accept. Download the Word file to edit it yourself.</p>`}

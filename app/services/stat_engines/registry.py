@@ -13,8 +13,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.services.stat_engines import (
-    agreement, anova_models, associations, categorical, comparisons, descriptives,
-    glm_models, regression_models, survival,
+    advanced_models, agreement, anova_models, associations, categorical, comparisons,
+    descriptives, glm_models, regression_models, survival,
 )
 from app.services.stat_engines.base import EngineError
 
@@ -202,6 +202,20 @@ REGISTRY: dict[str, dict] = {
         "fn": glm_models.ordinal_logistic_regression,
         "params": {"outcome": "ordered categorical column (3+ levels)", "predictors": "list of predictors"},
         "when": "Model an ORDERED categorical outcome (e.g. Likert, disease stage) from predictors.",
+    },
+    "manova": {
+        "title": "One-way MANOVA",
+        "fn": advanced_models.manova,
+        "params": {"outcomes": "list of 2+ numeric outcome columns", "group": "grouping factor"},
+        "when": "Compare groups on SEVERAL numeric outcomes jointly (multivariate ANOVA).",
+    },
+    "mixed_effects": {
+        "title": "Linear mixed-effects model",
+        "fn": advanced_models.mixed_effects,
+        "params": {"outcome": "numeric column", "predictors": "list of fixed-effect predictors",
+                   "group": "random-intercept grouping (e.g. subject or site)"},
+        "when": "Numeric outcome with clustered/repeated/multilevel data (random intercept per "
+                "subject or site) — accounts for non-independence.",
     },
 }
 

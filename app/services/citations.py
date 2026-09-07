@@ -70,6 +70,8 @@ _REFS: dict[str, str] = {
     "hilbe2011": "Hilbe, J. M. (2011). Negative Binomial Regression (2nd ed.). Cambridge University Press.",
     "mccullagh1980": "McCullagh, P. (1980). Regression models for ordinal data. Journal of the Royal Statistical Society: Series B, 42(2), 109–142.",
     "tate1954": "Tate, R. F. (1954). Correlation between a discrete and a continuous variable. Point-biserial correlation. Annals of Mathematical Statistics, 25(3), 603–607.",
+    "rencher2002": "Rencher, A. C. (2002). Methods of Multivariate Analysis (2nd ed.). Wiley.",
+    "laird1982": "Laird, N. M., & Ware, J. H. (1982). Random-effects models for longitudinal data. Biometrics, 38(4), 963–974.",
 
     # --- Diagnostic accuracy ---
     "altman1994": "Altman, D. G., & Bland, J. M. (1994). Diagnostic tests 1: sensitivity and specificity. BMJ, 308(6943), 1552.",
