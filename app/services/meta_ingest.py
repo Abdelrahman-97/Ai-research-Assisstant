@@ -39,10 +39,24 @@ MEASURE_COLUMNS: dict[str, list[tuple[str, str, str]]] = {
                    ("n", "n", "Sample size")],
     "proportion": [("name", "name", "Study"), ("events", "events", "Events"),
                    ("total", "total", "Total")],
+    # Change-from-baseline (pre/post) — group 1 (intervention) then group 2 (control).
+    "md_change":  [("name", "name", "Study"),
+                   ("n1", "n1", "N (group 1)"),
+                   ("pre1_mean", "pre1_mean", "Baseline mean (group 1)"),
+                   ("pre1_sd", "pre1_sd", "Baseline SD (group 1)"),
+                   ("post1_mean", "post1_mean", "Final mean (group 1)"),
+                   ("post1_sd", "post1_sd", "Final SD (group 1)"),
+                   ("n2", "n2", "N (group 2)"),
+                   ("pre2_mean", "pre2_mean", "Baseline mean (group 2)"),
+                   ("pre2_sd", "pre2_sd", "Baseline SD (group 2)"),
+                   ("post2_mean", "post2_mean", "Final mean (group 2)"),
+                   ("post2_sd", "post2_sd", "Final SD (group 2)")],
 }
-# OR / RR / RD / Peto share the 2x2 layout; MD / SMD share the means layout.
+# OR / RR / RD / Peto share the 2x2 layout; MD / SMD share the means layout;
+# md_change / smd_change share the pre/post layout.
 MEASURE_COLUMNS["rr"] = MEASURE_COLUMNS["rd"] = MEASURE_COLUMNS["peto"] = MEASURE_COLUMNS["or"]
 MEASURE_COLUMNS["smd"] = MEASURE_COLUMNS["md"]
+MEASURE_COLUMNS["smd_change"] = MEASURE_COLUMNS["md_change"]
 
 # Optional trailing columns (added by the researcher only if they need them).
 OPTIONAL_COLUMNS: list[tuple[str, str, str]] = [
@@ -74,6 +88,16 @@ _ALIASES: dict[str, str] = {
     "r": "r", "correlation": "r", "corr": "r", "rho": "r", "pearsonr": "r",
     "n": "n", "total": "total", "samplesize": "n", "sample": "n",
     "events": "events", "cases": "events", "x": "events", "count": "events",
+    # change-from-baseline (pre/post)
+    "pre1mean": "pre1_mean", "baseline1": "pre1_mean", "baselinemean1": "pre1_mean",
+    "pre1sd": "pre1_sd", "baselinesd1": "pre1_sd",
+    "post1mean": "post1_mean", "final1": "post1_mean", "finalmean1": "post1_mean",
+    "post1sd": "post1_sd", "finalsd1": "post1_sd",
+    "pre2mean": "pre2_mean", "baseline2": "pre2_mean", "baselinemean2": "pre2_mean",
+    "pre2sd": "pre2_sd", "baselinesd2": "pre2_sd",
+    "post2mean": "post2_mean", "final2": "post2_mean", "finalmean2": "post2_mean",
+    "post2sd": "post2_sd", "finalsd2": "post2_sd",
+    "corr": "corr", "correlation1": "corr", "prepostcorr": "corr", "prepostcorrelation": "corr",
     "group": "group", "subgroup": "group", "category": "group", "arm": "group",
     "moderator": "moderator", "mod": "moderator", "covariate": "moderator",
     "year": "year", "date": "year", "pubyear": "year",
@@ -104,6 +128,17 @@ def _sanity(measure: str, s: dict) -> str | None:
                 return f"N must be at least 2 ({lbl})"
             if sd is not None and sd <= 0:
                 return f"SD must be greater than 0 ({lbl})"
+    elif measure in ("md_change", "smd_change"):
+        for n, lbl in ((g("n1"), "group 1"), (g("n2"), "group 2")):
+            if n is not None and n < 2:
+                return f"N must be at least 2 ({lbl})"
+        for sd, lbl in ((g("pre1_sd"), "baseline SD group 1"), (g("post1_sd"), "final SD group 1"),
+                        (g("pre2_sd"), "baseline SD group 2"), (g("post2_sd"), "final SD group 2")):
+            if sd is not None and sd <= 0:
+                return f"{lbl} must be greater than 0"
+        c = g("corr")
+        if c is not None and not (-1 < c < 1):
+            return "pre-post correlation must be between -1 and 1"
     elif measure == "fisher_z":
         r, n = g("r"), g("n")
         if r is not None and not (-1 < r < 1):
@@ -150,6 +185,9 @@ def _map_headers(headers: list[str], measure: str) -> dict[str, int]:
     # generic also accepts 'variance' instead of 'se'
     if measure == "generic":
         wanted.add("variance")
+    # change-from-baseline accepts an optional per-study pre-post correlation
+    if measure in ("md_change", "smd_change"):
+        wanted.add("corr")
     mapping: dict[str, int] = {}
     for idx, h in enumerate(headers):
         nh = _norm(h)
@@ -175,8 +213,11 @@ def _to_float(x) -> float | None:
         return None
 
 
-def parse(path: str | Path, measure: str) -> dict:
+def parse(path: str | Path, measure: str, *, corr: float = 0.5) -> dict:
     """Read a study spreadsheet and return studies + preview + validation.
+
+    `corr` is the default pre-post correlation applied to change-from-baseline
+    measures when a study has no per-row correlation column.
 
     Returns a dict:
       {measure, n_rows, mapped_columns, missing_columns, studies (valid),
@@ -213,7 +254,7 @@ def parse(path: str | Path, measure: str) -> dict:
             + ". Download the template to see the exact headers expected."
         )
 
-    numeric_keys = [k for k in mapping if k not in ("name", "group")]
+    numeric_keys = [k for k in mapping if k not in ("name", "group", "corr")]
     rows = df.to_dict(orient="records")
     values = list(df.itertuples(index=False, name=None))
 
@@ -259,6 +300,10 @@ def parse(path: str | Path, measure: str) -> dict:
             yv = _to_float(row[mapping["year"]])
             if yv is not None:
                 study["year"] = int(yv)
+        # pre-post correlation: per-study column if present, else the global default
+        if measure in ("md_change", "smd_change"):
+            cv = _to_float(row[mapping["corr"]]) if "corr" in mapping else None
+            study["corr"] = cv if cv is not None else corr
 
         if bad is None:
             bad = _sanity(measure, study)

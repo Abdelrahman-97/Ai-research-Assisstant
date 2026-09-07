@@ -122,6 +122,24 @@ def test_meta_smd_from_raw():
     assert r["random"]["estimate"] > 0
 
 
+def test_meta_change_from_baseline():
+    studies = [
+        {"name": "A", "n1": 30, "pre1_mean": 52.1, "pre1_sd": 8.0, "post1_mean": 44.3, "post1_sd": 7.5,
+         "n2": 30, "pre2_mean": 51.8, "pre2_sd": 8.2, "post2_mean": 49.0, "post2_sd": 7.9, "corr": 0.5},
+        {"name": "B", "n1": 25, "pre1_mean": 50, "pre1_sd": 7, "post1_mean": 43, "post1_sd": 7,
+         "n2": 25, "pre2_mean": 50, "pre2_sd": 7, "post2_mean": 48, "post2_sd": 7, "corr": 0.6},
+    ]
+    md = meta_analysis.analyze(studies, measure="md_change")
+    assert md["scale_label"].startswith("MD (change")
+    assert md["random"]["estimate"] < 0            # intervention improved more
+    smd = meta_analysis.analyze(studies, measure="smd_change")
+    assert smd["scale_label"].startswith("SMD (change")
+    # correlation is validated
+    bad = [dict(s, corr=1.5) for s in studies]
+    with pytest.raises(meta_analysis.MetaAnalysisError):
+        meta_analysis.analyze(bad, measure="md_change")
+
+
 def test_meta_fisher_z():
     studies = [{"name": "A", "r": 0.3, "n": 50}, {"name": "B", "r": 0.4, "n": 60}]
     r = meta_analysis.analyze(studies, measure="fisher_z")

@@ -336,6 +336,7 @@ def tool_estimate(run_id: str, body: ToolEstimateRequest,
 async def meta_parse(
     run_id: str,
     measure: str = Form("generic"),
+    corr: float = Form(0.5),
     data_file: UploadFile = File(...),
     user: User = Depends(get_current_user),
 ) -> dict:
@@ -356,7 +357,7 @@ async def meta_parse(
     tmp = Path(tempfile.mkdtemp()) / f"studies{suffix}"
     tmp.write_bytes(await _read_capped(data_file))
     try:
-        return meta_ingest.parse(tmp, measure)
+        return meta_ingest.parse(tmp, measure, corr=corr)
     except meta_ingest.MetaIngestError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                             detail=str(exc)) from exc

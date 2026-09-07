@@ -166,6 +166,7 @@ window.NEURA_I18N = (function () {
     "Paper / study": "بحث / دراسة",
     "Standard": "قياسي",
     "Two-column": "عمودان",
+    "Pre–post correlation (r)": "معامل الارتباط قبل/بعد (r)",
     "Between-study variance (τ²)": "التباين بين الدراسات (τ²)",
     "Fill in one study at a time. Add a row for each study (minimum 2).":
       "املأ دراسة واحدة في كل مرة. أضف صفًّا لكل دراسة (بحدّ أدنى دراستان).",

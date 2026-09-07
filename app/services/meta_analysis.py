@@ -41,6 +41,8 @@ _TRANSFORM = {
     "or": ("exp", "OR"), "rr": ("exp", "RR"), "peto": ("exp", "Peto OR"),
     "hr": ("exp", "HR"), "fisher_z": ("tanh", "r"), "proportion": ("expit", "proportion"),
     "md": (None, "MD"), "smd": (None, "SMD (Hedges g)"), "rd": (None, "RD"),
+    "md_change": (None, "MD (change from baseline)"),
+    "smd_change": (None, "SMD (change from baseline, Hedges g)"),
     "generic": (None, "effect"),
 }
 
@@ -71,6 +73,32 @@ def _effect(measure: str, s: dict) -> tuple[float, float]:
         if g("effect") is not None and g("se") is not None:
             return float(s["effect"]), float(s["se"]) ** 2
         raise MetaAnalysisError("For HR provide log-HR as 'effect' and its 'se'.")
+    if measure in ("md_change", "smd_change"):
+        # Change-from-baseline (pre/post) design. Derive each group's change
+        # mean and change SD, then treat exactly like MD / SMD. The change SD
+        # uses the pre-post correlation r (Cochrane Handbook 6.5.2.8):
+        #   SD_change = sqrt(SD_pre^2 + SD_post^2 - 2*r*SD_pre*SD_post)
+        r = float(s.get("corr", 0.5))
+        if not (-1 < r < 1):
+            raise MetaAnalysisError("Pre-post correlation must be between -1 and 1.")
+        n1, n2 = float(s["n1"]), float(s["n2"])
+        c1 = float(s["post1_mean"]) - float(s["pre1_mean"])
+        c2 = float(s["post2_mean"]) - float(s["pre2_mean"])
+        pre1, post1 = float(s["pre1_sd"]), float(s["post1_sd"])
+        pre2, post2 = float(s["pre2_sd"]), float(s["post2_sd"])
+        v1 = pre1 ** 2 + post1 ** 2 - 2 * r * pre1 * post1
+        v2 = pre2 ** 2 + post2 ** 2 - 2 * r * pre2 * post2
+        if v1 <= 0 or v2 <= 0:
+            raise MetaAnalysisError("Change-score SD is non-positive; check SDs and correlation.")
+        sd1c, sd2c = math.sqrt(v1), math.sqrt(v2)
+        if measure == "md_change":
+            return c1 - c2, sd1c ** 2 / n1 + sd2c ** 2 / n2
+        sp = math.sqrt(((n1 - 1) * sd1c ** 2 + (n2 - 1) * sd2c ** 2) / (n1 + n2 - 2))
+        d = (c1 - c2) / sp
+        J = 1 - 3 / (4 * (n1 + n2) - 9)
+        gg = J * d
+        vi = (n1 + n2) / (n1 * n2) + gg ** 2 / (2 * (n1 + n2 - 2))
+        return gg, vi
     if measure in ("md", "smd"):
         n1, m1, sd1 = float(s["n1"]), float(s["m1"]), float(s["sd1"])
         n2, m2, sd2 = float(s["n2"]), float(s["m2"]), float(s["sd2"])

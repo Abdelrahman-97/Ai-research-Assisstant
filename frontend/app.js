@@ -741,13 +741,20 @@ function viewToolInput(task) {
       <option value="rr">Risk ratio (from 2×2 counts)</option>
       <option value="rd">Risk difference (from 2×2 counts)</option>
       <option value="peto">Peto odds ratio (from 2×2 counts)</option>
-      <option value="md">Mean difference (from group means)</option>
-      <option value="smd">Standardized mean difference / Hedges g</option>
+      <option value="md">Mean difference (endpoint / final values)</option>
+      <option value="smd">Standardized mean difference / Hedges g (endpoint)</option>
+      <option value="md_change">Mean difference — change from baseline (pre/post)</option>
+      <option value="smd_change">SMD / Hedges g — change from baseline (pre/post)</option>
       <option value="fisher_z">Correlation (r)</option>
       <option value="proportion">Single proportion</option>
       <option value="hr">Hazard ratio (log-HR + SE)</option>
     </select>
     <div id="mHelp" class="muted-note" style="margin-top:6px;"></div>
+    <div id="mCorrWrap" class="hidden" style="margin-top:8px;">
+      <label>Pre–post correlation (r)</label>
+      <input id="mCorr" type="number" step="0.05" min="0" max="0.99" value="0.5" />
+      <p class="muted-note">Used to compute each study's change-score SD from its baseline and final SDs (RevMan does the same). If unknown, 0.5 is a common, conservative assumption. A per-study <code>corr</code> column in your file overrides this.</p>
+    </div>
 
     <label style="margin-top:14px;">2 · Optional columns you also want to use</label>
     <label class="agree"><input type="checkbox" id="mSub" /> <span><strong>Subgroups</strong> — adds a <em>group</em> column + tests differences between subgroups</span></label>
@@ -802,11 +809,13 @@ const MEASURE_SCHEMA = {
   hr:         [["name","name","Study","Smith 2019"],["effect","logHR","log Hazard ratio","-0.36"],["se","standard_error","Standard error","0.14"]],
   or:         [["name","name","Study","Smith 2019"],["e1","events1","Events (grp 1)","20"],["n1","n1","N (grp 1)","100"],["e2","events2","Events (grp 2)","30"],["n2","n2","N (grp 2)","100"]],
   md:         [["name","name","Study","Smith 2019"],["n1","n1","N (grp 1)","40"],["m1","mean1","Mean (grp 1)","5.2"],["sd1","sd1","SD (grp 1)","1.1"],["n2","n2","N (grp 2)","40"],["m2","mean2","Mean (grp 2)","4.6"],["sd2","sd2","SD (grp 2)","1.2"]],
+  md_change:  [["name","name","Study","Smith 2019"],["n1","n1","N (grp 1)","30"],["pre1_mean","pre1_mean","Baseline mean (g1)","52.1"],["pre1_sd","pre1_sd","Baseline SD (g1)","8.0"],["post1_mean","post1_mean","Final mean (g1)","44.3"],["post1_sd","post1_sd","Final SD (g1)","7.5"],["n2","n2","N (grp 2)","30"],["pre2_mean","pre2_mean","Baseline mean (g2)","51.8"],["pre2_sd","pre2_sd","Baseline SD (g2)","8.2"],["post2_mean","post2_mean","Final mean (g2)","49.0"],["post2_sd","post2_sd","Final SD (g2)","7.9"]],
   fisher_z:   [["name","name","Study","Smith 2019"],["r","r","Correlation r","0.30"],["n","n","Sample size","50"]],
   proportion: [["name","name","Study","Smith 2019"],["events","events","Events","25"],["total","total","Total","100"]],
 };
 MEASURE_SCHEMA.rr = MEASURE_SCHEMA.rd = MEASURE_SCHEMA.peto = MEASURE_SCHEMA.or;
 MEASURE_SCHEMA.smd = MEASURE_SCHEMA.md;
+MEASURE_SCHEMA.smd_change = MEASURE_SCHEMA.md_change;
 
 /* Which optional columns are switched on (key, header, label, type). */
 function metaOptionalCols() {
@@ -834,6 +843,8 @@ const META_HELP = {
   peto: "Columns: name, events1, n1, events2, n2" + _OPT + ".",
   md: "Columns: name, n1, mean1, sd1, n2, mean2, sd2" + _OPT + ".",
   smd: "Columns: name, n1, mean1, sd1, n2, mean2, sd2" + _OPT + ".",
+  md_change: "Change from baseline: each group's N, baseline mean/SD, and final mean/SD. We compute the change and its SD using the pre–post correlation below.",
+  smd_change: "Change from baseline (standardized): each group's N, baseline mean/SD, and final mean/SD. Change SD uses the pre–post correlation below.",
   fisher_z: "Columns: name, r, n" + _OPT + ". Example: Smith 2019, 0.3, 50, adults",
   proportion: "Columns: name, events, total" + _OPT + ". Example: Smith 2019, 25, 100",
   hr: "Columns: name, logHR, standard_error" + _OPT + ". Enter the natural log of the HR.",
@@ -878,6 +889,13 @@ function gatherToolInputs(task) {
   } else {
     studies = parsePastedStudies(measure);
     if (studies.length < 2) throw new Error("Enter at least 2 studies, one per line.");
+  }
+  // Change-from-baseline: attach the global pre-post correlation to studies that
+  // don't carry their own (upload-mode studies already have it from the server).
+  if (measure === "md_change" || measure === "smd_change") {
+    let rc = _num(document.getElementById("mCorr")?.value);
+    if (rc === null || isNaN(rc)) rc = 0.5;
+    studies = studies.map(s => (s.corr === undefined ? { ...s, corr: rc } : s));
   }
   return { studies, measure, model: document.getElementById("mModel").value,
            tau2_method: document.getElementById("mTau").value,
@@ -1053,7 +1071,12 @@ function bindMetaHandlers() {
   const r = state.run;
   const measureEl = document.getElementById("mMeasure");
   const modeEl = document.getElementById("mMode");
-  const desc = () => { document.getElementById("mHelp").textContent = META_HELP[measureEl.value] || ""; };
+  const isChange = () => ["md_change", "smd_change"].includes(measureEl.value);
+  const desc = () => {
+    document.getElementById("mHelp").textContent = META_HELP[measureEl.value] || "";
+    const cw = document.getElementById("mCorrWrap");
+    if (cw) cw.classList.toggle("hidden", !isChange());
+  };
   const guide = () => {
     const el = document.getElementById("mPasteHelp");
     if (el) el.innerHTML = metaPasteGuide();
@@ -1102,6 +1125,7 @@ function bindMetaHandlers() {
     if (!file) throw new Error("Choose a file to check first.");
     const fd = new FormData();
     fd.append("measure", measureEl.value);
+    if (isChange()) fd.append("corr", document.getElementById("mCorr").value || "0.5");
     fd.append("data_file", file);
     const res = await api(`/runs/${r.id}/meta-parse`, { method: "POST", form: fd });
     state.metaStudies = res.studies;

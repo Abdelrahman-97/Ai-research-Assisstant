@@ -51,6 +51,17 @@ def test_invalid_rows_are_flagged_not_fatal(tmp_path):
     assert r["warnings"]
 
 
+def test_parse_change_from_baseline_with_global_corr(tmp_path):
+    p = _write(tmp_path, "s.csv",
+               "name,n1,pre1_mean,pre1_sd,post1_mean,post1_sd,n2,pre2_mean,pre2_sd,post2_mean,post2_sd\n"
+               "A,30,52.1,8,44.3,7.5,30,51.8,8.2,49,7.9\n"
+               "B,25,50,7,43,7,25,50,7,48,7\n")
+    r = meta_ingest.parse(p, "md_change", corr=0.6)
+    assert r["n_valid"] == 2
+    assert r["studies"][0]["corr"] == 0.6      # global correlation injected
+    assert meta_analysis.analyze(r["studies"], measure="md_change")["k"] == 2
+
+
 def test_missing_required_column_raises(tmp_path):
     p = _write(tmp_path, "s.csv", "name,effect\nA,0.2\nB,0.3\n")
     with pytest.raises(meta_ingest.MetaIngestError) as exc:
