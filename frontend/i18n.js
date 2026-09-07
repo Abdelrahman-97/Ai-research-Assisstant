@@ -167,6 +167,10 @@ window.NEURA_I18N = (function () {
     "Standard": "قياسي",
     "Two-column": "عمودان",
     "Pre–post correlation (r)": "معامل الارتباط قبل/بعد (r)",
+    "Continue": "متابعة",
+    "🔬 Audited analyses selected": "🔬 تحاليل موثّقة مختارة",
+    "no custom code": "بدون أكواد مخصّصة",
+    "audited engines": "محرّكات موثّقة",
     "Between-study variance (τ²)": "التباين بين الدراسات (τ²)",
     "Fill in one study at a time. Add a row for each study (minimum 2).":
       "املأ دراسة واحدة في كل مرة. أضف صفًّا لكل دراسة (بحدّ أدنى دراستان).",

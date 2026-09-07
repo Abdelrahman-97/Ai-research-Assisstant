@@ -38,6 +38,7 @@ from app.models.schemas import (
     TestConfirmation,
 )
 from app.services import (
+    analysis_router,
     diagnostic,
     evidence,
     formatting,
@@ -51,6 +52,7 @@ from app.services import (
     stats_executor,
     tool_report,
 )
+from app.services.stat_engines import registry as engine_registry
 from app.store import blobs, repository
 
 
@@ -275,17 +277,59 @@ def _require_paid(run: Run) -> None:
         raise PipelineError("This run has not been paid for yet.")
 
 
+def _engine_plan_summary_test(plan) -> "ProposedTest":
+    """Synthesize a ProposedTest so the existing plan UI/fields work in engine mode."""
+    from app.models.schemas import ProposedTest
+    names = "; ".join(i.label or i.engine for i in plan.items)
+    reasoning = " ".join(f"{i.label}: {i.reasoning}".strip() for i in plan.items) or \
+        "Audited engines selected for your data and protocol."
+    variables = sorted({v for i in plan.items for v in _plan_item_columns(i)})
+    return ProposedTest(name=names or "Selected analyses", reasoning=reasoning, variables=variables)
+
+
+def _plan_item_columns(item) -> list[str]:
+    cols: list[str] = []
+    for v in (item.params or {}).values():
+        if isinstance(v, str):
+            cols.append(v)
+        elif isinstance(v, list):
+            cols.extend(str(x) for x in v)
+    return cols
+
+
 def propose_plan(run: Run) -> Run:
-    """Step 3: AI proposes a plan, then STOP for the human checkpoint."""
+    """Step 3: AI proposes a plan, then STOP for the human checkpoint.
+
+    Engine-first: the router picks audited engines. If it can't cover the request
+    (or no LLM is configured), we fall back to the AI-generated-script planner.
+    """
     _require_paid(run)
     if run.status != RunStatus.paid or run.data_summary is None:
         raise PipelineError("Pay for the run before requesting a plan.")
 
-    run.proposed_test = planner.propose_plan(
-        protocol=run.protocol_text or "",
-        data_summary=run.data_summary,
-        scope=run.scope,
-    )
+    plan = None
+    if settings.llm_api_key:
+        try:
+            plan = analysis_router.propose(
+                protocol=run.protocol_text or "",
+                data_summary=run.data_summary,
+                scope=run.scope,
+            )
+        except Exception:  # noqa: BLE001 - fall back to the script planner
+            plan = None
+
+    if plan is not None and not plan.fallback_to_script and plan.items:
+        run.analysis_mode = "engine"
+        run.engine_plan = plan
+        run.proposed_test = _engine_plan_summary_test(plan)
+    else:
+        run.analysis_mode = "script"
+        run.engine_plan = plan  # keep the note (why fallback) if present
+        run.proposed_test = planner.propose_plan(
+            protocol=run.protocol_text or "",
+            data_summary=run.data_summary,
+            scope=run.scope,
+        )
     run.status = RunStatus.awaiting_approval
     return _touch(run)
 
@@ -301,8 +345,9 @@ def approve_plan(run: Run, confirmation: TestConfirmation) -> Run:
         )
 
     run.approved_test = confirmation.edited_plan or run.proposed_test
-    # Re-attach curated evidence in case the user edited the test choice.
-    if run.approved_test is not None:
+    # Re-attach curated evidence in case the user edited the test choice. In engine
+    # mode each engine carries its own citation, so we skip this step.
+    if run.approved_test is not None and run.analysis_mode != "engine":
         evidence.attach(run.approved_test)
     run.status = RunStatus.approved
     return _touch(run)
@@ -318,6 +363,18 @@ def generate_script(run: Run, language: Language) -> Run:
     retryable = {RunStatus.approved, RunStatus.script_ready, RunStatus.failed}
     if run.status not in retryable or run.approved_test is None:
         raise PipelineError("Approve a plan before generating a script.")
+
+    # Engine mode: there is no code to generate. Show a readable description of
+    # the audited engines that will run, and advance to the "ready to run" state.
+    if run.analysis_mode == "engine" and run.engine_plan and run.engine_plan.items:
+        lines = ["# Audited analyses that will run (no code is generated)\n"]
+        for i, it in enumerate(run.engine_plan.items, 1):
+            cols = ", ".join(f"{k}={v}" for k, v in (it.params or {}).items())
+            lines.append(f"{i}. **{it.label or it.engine}** — {cols}")
+        run.script = "\n".join(lines)
+        run.language = language
+        run.status = RunStatus.script_ready
+        return _touch(run)
 
     data_filename = f"data{Path(run.data_path).suffix.lower()}" if run.data_path else "data.csv"
     run.language = language
@@ -373,14 +430,58 @@ def _ensure_local_data(run: Run) -> str:
     raise PipelineError("The uploaded dataset is no longer available for this run.")
 
 
+def _run_engine_plan(run: Run, data_path: str) -> list[dict]:
+    """Run every engine in the plan deterministically; collect their results.
+
+    One engine failing doesn't fail the run — its error is recorded and it's simply
+    omitted from the write-up.
+    """
+    df = integrity_checker.read_dataframe(data_path)
+    art_dir = Path(settings.data_dir) / "outputs" / "artifacts" / run.id
+    art_dir.mkdir(parents=True, exist_ok=True)
+    results: list[dict] = []
+    for item in run.engine_plan.items:
+        try:
+            r = engine_registry.run_engine(item.engine, df, item.params, fig_dir=art_dir)
+            results.append({
+                "engine": r["key"], "title": r["title"], "markdown": r["markdown"],
+                "values": r["values"], "references": r["references"],
+                "figure_path": r.get("figure_path"),
+            })
+        except Exception as exc:  # noqa: BLE001 - record and skip a bad engine
+            results.append({"engine": item.engine, "title": item.label or item.engine,
+                            "error": str(exc)})
+    return results
+
+
 def run_script(run: Run) -> Run:
-    """Step 5: execute the previewed script in the sandbox."""
+    """Step 5: run the analysis — audited engines (engine mode) or the sandbox script."""
     _require_paid(run)
     retryable = {RunStatus.script_ready, RunStatus.queued, RunStatus.executing, RunStatus.failed}
     if run.status not in retryable or not run.script or not run.language:
         raise PipelineError("Generate a script before running it.")
 
     data_path = _ensure_local_data(run)
+
+    # Engine mode: run the audited engines instead of a sandboxed script.
+    if run.analysis_mode == "engine" and run.engine_plan and run.engine_plan.items:
+        run.status = RunStatus.executing
+        _touch(run)
+        try:
+            results = _run_engine_plan(run, data_path)
+        except Exception as exc:  # noqa: BLE001
+            run.status = RunStatus.failed
+            run.error = f"Analysis error: {exc}"
+            _touch(run)
+            raise PipelineError(run.error) from exc
+        run.engine_results = results
+        if not any("error" not in r for r in results):
+            run.status = RunStatus.failed
+            run.error = "; ".join(r.get("error", "") for r in results) or "All analyses failed."
+            return _touch(run)
+        run.status = RunStatus.executed
+        run.error = None
+        return _touch(run)
 
     run.status = RunStatus.executing
     _touch(run)
@@ -412,9 +513,86 @@ def run_script(run: Run) -> Run:
     return _touch(run)
 
 
+def _strip_refs(md: str) -> str:
+    """Drop a trailing '## References' block so we can append one combined list."""
+    return md.split("\n## References")[0].rstrip()
+
+
+def _resolve_fmt_template(run: Run, out_dir: Path):
+    fmt = formatting.resolve(run.format_spec)
+    template_path = None
+    if fmt.use_template and fmt.template_blob_id:
+        got = blobs.get(fmt.template_blob_id)
+        if got:
+            tdir = out_dir / "templates"
+            tdir.mkdir(parents=True, exist_ok=True)
+            template_path = tdir / f"tpl_{run.id}.docx"
+            template_path.write_bytes(got[1])
+    return fmt, template_path
+
+
+def _write_engine_results(run: Run) -> Run:
+    """Step 6 (engine mode): write the Results narrative from the audited engines."""
+    if run.status != RunStatus.executed or not run.engine_results:
+        raise PipelineError("Run the analysis before writing results.")
+    run.status = RunStatus.writing
+    _touch(run)
+
+    lang = run.output_language if run.output_language in ("en", "ar") else "en"
+    is_rtl = lang == "ar"
+    ok = [r for r in run.engine_results if "error" not in r]
+    if not ok:
+        run.status = RunStatus.failed
+        run.error = "No analysis produced a usable result."
+        return _touch(run)
+
+    facts = "\n\n".join(_strip_refs(r["markdown"]) for r in ok)
+    markdown = facts
+    if settings.llm_api_key:
+        try:
+            narrative = results_writer.write_engine_results(
+                facts=facts, scope=run.scope, language=lang).strip()
+            if narrative:
+                markdown = narrative + "\n\n## Detailed statistical output\n\n" + facts
+        except Exception:  # noqa: BLE001 - never fail a paid job on the writer
+            markdown = facts
+
+    # one combined References section (curated, from the engines)
+    refs: list[str] = []
+    for r in ok:
+        for ref in r.get("references", []):
+            if ref and ref not in refs:
+                refs.append(ref)
+    if refs:
+        markdown += "\n\n## References\n\n" + "\n".join(f"{i + 1}. {x}" for i, x in enumerate(refs))
+
+    artifacts = [Artifact(kind="figure", path=r["figure_path"], caption=r.get("title"))
+                 for r in ok if r.get("figure_path")]
+
+    out_dir = Path(settings.data_dir) / "outputs"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    docx_path = out_dir / f"results_{run.id}.docx"
+    pdf_path = out_dir / f"results_{run.id}.pdf"
+    fmt, template_path = _resolve_fmt_template(run, out_dir)
+    report_writer.markdown_to_docx(markdown, artifacts, docx_path, fmt=fmt,
+                                   template_path=template_path, rtl=is_rtl)
+    report_writer.markdown_to_pdf(markdown, artifacts, pdf_path, fmt=fmt, rtl=is_rtl)
+    run.docx_blob_id = blobs.put(run.id, kind="docx", filename=docx_path.name,
+                                 content=docx_path.read_bytes())
+    run.pdf_blob_id = blobs.put(run.id, kind="pdf", filename=pdf_path.name,
+                                content=pdf_path.read_bytes())
+    run.results_markdown = markdown
+    run.docx_path = str(docx_path)
+    run.pdf_path = str(pdf_path)
+    run.status = RunStatus.completed
+    return _touch(run)
+
+
 def write_results(run: Run) -> Run:
     """Step 6: AI verifies output, writes the Results section, exports docx + pdf."""
     _require_paid(run)
+    if run.analysis_mode == "engine" and run.engine_results is not None:
+        return _write_engine_results(run)
     if run.status != RunStatus.executed or run.execution is None or run.approved_test is None:
         raise PipelineError("Run the script before writing results.")
 

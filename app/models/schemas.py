@@ -272,6 +272,27 @@ class TestConfirmation(BaseModel):
     note: str | None = None
 
 
+class EnginePlanItem(BaseModel):
+    """One audited engine the router chose to run, with its column mapping."""
+
+    engine: str = Field(..., description="Registry key, e.g. 'independent_ttest'")
+    label: str = Field(default="", description="Human title, e.g. 'Independent-samples t-test'")
+    params: dict = Field(default_factory=dict, description="Column mapping the engine needs")
+    reasoning: str = Field(default="", description="Why this test fits the data + protocol")
+
+
+class EnginePlan(BaseModel):
+    """The engine-first analysis plan: audited engines to run (no AI-written code).
+
+    `fallback_to_script` is True when the router couldn't cover the request with
+    engines and the AI-generated-script path should be used instead.
+    """
+
+    items: list[EnginePlanItem] = Field(default_factory=list)
+    fallback_to_script: bool = False
+    note: str = ""
+
+
 class Artifact(BaseModel):
     """A single output from the sandbox run (table, figure, or raw output)."""
 
@@ -363,6 +384,13 @@ class Run(BaseModel):
     language: Language | None = None
     script: str | None = None
     execution: ExecutionResult | None = None
+
+    # engine-first analysis: the AI selects audited engines (no code) and we run
+    # them deterministically. Falls back to the script path above when no engine
+    # covers the request. analysis_mode: "engine" | "script".
+    analysis_mode: str = "script"
+    engine_plan: EnginePlan | None = None
+    engine_results: list[dict] | None = None
 
     # extra analyses added via the assistant (the primary test stays in the
     # fields above; these are additional tests so one run can cover several)

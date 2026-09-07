@@ -145,6 +145,52 @@ def write_meta_narrative(
     )
 
 
+_ENGINE_INSTRUCTIONS = """\
+Write the Results section of a {scope} using ONLY the STATISTICAL OUTPUT below,
+which contains the results of audited analyses already computed. Do NOT introduce
+any number, statistic, or citation that is not present there.
+
+Requirements:
+- Write flowing academic prose in the past tense (not bullet points), at the
+  standard of a {scope}.
+- Report each analysis in turn with its key statistics (test statistic, df,
+  p-value, effect size, confidence intervals, group descriptives) exactly as given.
+- Refer the reader to the relevant figures/tables where helpful.
+- {language_rule}
+- Report p-values in APA style (e.g. "p < .001", otherwise "p = .032"). Round only
+  for presentation; never change or invent a value.
+- Output Markdown using short headings and paragraphs only. Do NOT write a
+  References section — references are appended separately.
+
+STATISTICAL OUTPUT:
+---
+{facts}
+---
+"""
+
+
+def write_engine_results(
+    *,
+    facts: str,
+    scope: Scope,
+    language: str = "en",
+    client: LLMClient | None = None,
+) -> str:
+    """Turn audited-engine outputs into a thesis/paper Results narrative, grounded
+    strictly in `facts` (the deterministic numbers). Caller appends tables/figures."""
+    client = client or LLMClient()
+    lang = language if language in _LANG_RULES else "en"
+    scope_word = _SCOPE_WORD.get(getattr(scope, "value", scope), "research paper")
+    prompt = _ENGINE_INSTRUCTIONS.format(
+        scope=scope_word, facts=facts[:8000], language_rule=_LANG_RULES[lang],
+    )
+    system = _SYSTEM_AR if lang == "ar" else _SYSTEM
+    return client.chat(
+        [{"role": "system", "content": system},
+         {"role": "user", "content": prompt}]
+    )
+
+
 def _read_tables(artifacts: list[Artifact], max_chars: int = 4000) -> str:
     chunks: list[str] = []
     for art in artifacts:

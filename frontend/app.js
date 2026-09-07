@@ -500,8 +500,33 @@ function viewStartPlan() {
     <p class="sub">Ready to analyse. The AI will propose a statistical plan for you to approve.</p>
     <div class="btn-row"><button id="planBtn" class="btn btn-primary">Propose statistical plan</button></div>`;
 }
+function enginePlanHtml() {
+  const plan = state.run.engine_plan;
+  if (!plan || !plan.items || !plan.items.length) return "";
+  const items = plan.items.map(it => {
+    const cols = Object.entries(it.params || {})
+      .map(([k, v]) => `${esc(k)}: <strong>${esc(Array.isArray(v) ? v.join(", ") : v)}</strong>`).join(" · ");
+    return `<li style="margin-bottom:6px;"><strong>${esc(it.label || it.engine)}</strong>${it.reasoning ? ` — ${esc(it.reasoning)}` : ""}<div class="muted-note">${cols}</div></li>`;
+  }).join("");
+  return `
+    <div class="card" style="background:var(--accent-soft);border-color:var(--accent);margin-top:12px;">
+      <strong>🔬 Audited analyses selected</strong>
+      <span class="pill ok" style="margin-left:6px;">no custom code</span>
+      <p class="sub" style="margin:8px 0 4px;">These run on our verified statistical engines (each method is cited). The AI chose them for your data — you approve before anything runs.</p>
+      <ul style="margin:6px 0 0 18px;">${items}</ul>
+    </div>`;
+}
+
 function viewPlan() {
   const t = state.run.proposed_test || {};
+  // Engine-first mode: show the audited engines chosen, then approve.
+  if (state.run.analysis_mode === "engine" && state.run.engine_plan && state.run.engine_plan.items.length) {
+    return `
+      <h2>Proposed plan — your approval needed</h2>
+      <p class="sub">Review the analyses the AI selected. Approve to run them, or use "Your analyst" chat below to request changes. Nothing runs until you approve.</p>
+      ${enginePlanHtml()}
+      <div class="btn-row"><button id="approveBtn" class="btn btn-primary">Approve & continue</button></div>`;
+  }
   const ev = t.evidence;
   let evHtml = "";
   if (ev && ev.matched) {
@@ -533,6 +558,12 @@ function viewPlan() {
     </div>`;
 }
 function viewScriptGen() {
+  if (state.run.analysis_mode === "engine") {
+    return `
+      <h2>Plan approved <span class="pill ok">approved</span></h2>
+      <p class="sub">Your analyses run on our audited statistical engines — no custom code is written. Click continue to run them.</p>
+      <div class="btn-row"><button id="genScriptBtn" class="btn btn-primary">Continue</button></div>`;
+  }
   return `
     <h2>Plan approved <span class="pill ok">approved</span></h2>
     <p class="sub">Choose the language; the AI writes the analysis script for you to preview.</p>
@@ -547,6 +578,13 @@ function viewScriptGen() {
     <div class="btn-row"><button id="genScriptBtn" class="btn btn-primary">Generate script</button></div>`;
 }
 function viewScriptPreview() {
+  if (state.run.analysis_mode === "engine") {
+    return `
+      <h2>Ready to run <span class="pill ok">audited engines</span></h2>
+      <p class="sub">These verified analyses will run on your data — no custom code, each method cited.</p>
+      <pre class="code">${esc(state.run.script || "")}</pre>
+      <div class="btn-row"><button id="executeBtn" class="btn btn-primary">Run analysis</button></div>`;
+  }
   return `
     <h2>Script preview</h2>
     <p class="sub">This runs in an isolated sandbox (no network). Review it, then run.</p>
@@ -1219,6 +1257,12 @@ function bindRunHandlers() {
 
   const approveBtn = document.getElementById("approveBtn");
   if (approveBtn) approveBtn.onclick = () => step("approveBtn", async () => {
+    // Engine mode has no editable plan fields — just confirm.
+    if (state.run.analysis_mode === "engine" || !document.getElementById("pName")) {
+      state.run = await api(`/runs/${r.id}/approve`, { method: "POST", body: { confirmed: true } });
+      render();
+      return;
+    }
     const orig = state.run.proposed_test || {};
     const edited = {
       name: document.getElementById("pName").value.trim(),
