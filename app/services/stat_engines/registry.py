@@ -14,7 +14,7 @@ from pathlib import Path
 
 from app.services.stat_engines import (
     agreement, anova_models, associations, categorical, comparisons, descriptives,
-    regression_models, survival,
+    glm_models, regression_models, survival,
 )
 from app.services.stat_engines.base import EngineError
 
@@ -38,6 +38,12 @@ REGISTRY: dict[str, dict] = {
         "fn": comparisons.paired_ttest,
         "params": {"pre": "numeric column (before)", "post": "numeric column (after)"},
         "when": "Compare two related/paired numeric measurements (e.g. pre vs post) on the same subjects.",
+    },
+    "one_sample_ttest": {
+        "title": "One-sample t-test",
+        "fn": comparisons.one_sample_ttest,
+        "params": {"outcome": "numeric column", "popmean": "the reference value to compare against"},
+        "when": "Compare the mean of one numeric column against a known reference/target value.",
     },
     "one_way_anova": {
         "title": "One-way ANOVA",
@@ -75,6 +81,19 @@ REGISTRY: dict[str, dict] = {
         "fn": associations.chi_square,
         "params": {"var1": "categorical column", "var2": "categorical column"},
         "when": "Test the association between TWO categorical variables.",
+    },
+    "partial_correlation": {
+        "title": "Partial correlation",
+        "fn": associations.partial_correlation,
+        "params": {"var1": "numeric column", "var2": "numeric column",
+                   "covariates": "list of numeric columns to control for"},
+        "when": "Association between two numeric variables while controlling for other variable(s).",
+    },
+    "point_biserial": {
+        "title": "Point-biserial correlation",
+        "fn": associations.point_biserial,
+        "params": {"binary": "binary column", "continuous": "numeric column"},
+        "when": "Association between ONE binary variable and ONE continuous variable.",
     },
     "linear_regression": {
         "title": "Linear regression",
@@ -165,6 +184,24 @@ REGISTRY: dict[str, dict] = {
         "params": {"var1": "binary before column", "var2": "binary after column"},
         "when": "Paired binary data — change in a yes/no outcome measured twice on the same "
                 "subjects (e.g. before vs after).",
+    },
+    "poisson_regression": {
+        "title": "Poisson regression",
+        "fn": glm_models.poisson_regression,
+        "params": {"outcome": "count column (non-negative integers)", "predictors": "list of predictors"},
+        "when": "Model COUNT outcomes (e.g. number of events) from predictors; gives rate ratios.",
+    },
+    "negative_binomial_regression": {
+        "title": "Negative-binomial regression",
+        "fn": glm_models.negative_binomial_regression,
+        "params": {"outcome": "count column", "predictors": "list of predictors"},
+        "when": "Model OVER-DISPERSED count outcomes (variance ≫ mean) from predictors.",
+    },
+    "ordinal_logistic_regression": {
+        "title": "Ordinal logistic regression",
+        "fn": glm_models.ordinal_logistic_regression,
+        "params": {"outcome": "ordered categorical column (3+ levels)", "predictors": "list of predictors"},
+        "when": "Model an ORDERED categorical outcome (e.g. Likert, disease stage) from predictors.",
     },
 }
 

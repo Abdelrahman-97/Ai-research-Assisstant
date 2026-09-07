@@ -176,3 +176,70 @@ def _r_word(r):
     a = abs(r)
     return ("negligible" if a < 0.1 else "weak" if a < 0.3 else
             "moderate" if a < 0.5 else "strong" if a < 0.7 else "very strong")
+
+
+def partial_correlation(df: pd.DataFrame, params: dict, fig_dir: str | Path | None = None) -> dict:
+    """Pearson correlation between var1 and var2 controlling for covariate(s)."""
+    import statsmodels.api as sm
+
+    v1, v2 = params.get("var1"), params.get("var2")
+    covariates = params.get("covariates") or ([params["covariate"]] if params.get("covariate") else [])
+    if not v1 or not v2 or not covariates:
+        raise EngineError("Partial correlation needs 'var1', 'var2', and 'covariates' to control for.")
+    cols = [v1, v2] + list(covariates)
+    for c in cols:
+        get_col(df, c, "column")
+    data = df[cols].apply(pd.to_numeric, errors="coerce").dropna()
+    n = len(data)
+    k = len(covariates)
+    if n <= k + 3:
+        raise EngineError("Not enough complete rows for a partial correlation.")
+    C = sm.add_constant(data[list(covariates)])
+    r1 = data[v1] - sm.OLS(data[v1], C).fit().predict(C)
+    r2 = data[v2] - sm.OLS(data[v2], C).fit().predict(C)
+    r, _ = stats.pearsonr(r1, r2)
+    dfree = n - 2 - k
+    t = r * math.sqrt(dfree / (1 - r ** 2)) if abs(r) < 1 else float("inf")
+    p = float(2 * (1 - stats.t.cdf(abs(t), dfree)))
+    values = {"n": n, "r": round4(r), "p_value": p, "controlling_for": list(covariates),
+              "df": dfree, "r_squared": round4(r ** 2)}
+    md = [
+        "## Partial correlation\n",
+        f"We examined the association between **{v1}** and **{v2}** while controlling for "
+        f"{', '.join('**' + str(c) + '**' for c in covariates)} (n = {n}).\n",
+        f"The partial correlation was **{round4(r)}**, {pstr(p)} — a {_r_word(r)} "
+        + ("positive" if r >= 0 else "negative") + " association after adjustment.",
+    ]
+    refs = citations.refs(["pearson1895", "fisher1921"])
+    return {"key": "partial_correlation", "title": "Partial correlation", "values": values,
+            "markdown": "\n".join(md) + refs_block(refs), "references": refs,
+            "figure_path": None, "assumptions": ["Linear relationships", "Approximately normal variables"]}
+
+
+def point_biserial(df: pd.DataFrame, params: dict, fig_dir: str | Path | None = None) -> dict:
+    """Point-biserial correlation: a binary variable vs a continuous variable."""
+    binv = params.get("binary") or params.get("var1")
+    contv = params.get("continuous") or params.get("var2")
+    b = get_col(df, binv, "binary variable")
+    y = pd.to_numeric(get_col(df, contv, "continuous variable"), errors="coerce")
+    sub = pd.DataFrame({"b": b, "y": y}).dropna()
+    levels = list(pd.Series(sub["b"].astype(str).unique()))
+    if len(levels) != 2:
+        raise EngineError(f"Point-biserial needs a BINARY variable; '{binv}' has {len(levels)} levels.")
+    coded = sub["b"].astype(str).map({levels[0]: 0, levels[1]: 1})
+    if len(sub) < 3:
+        raise EngineError("Need at least 3 complete pairs.")
+    r, p = stats.pointbiserialr(coded, sub["y"])
+    values = {"n": int(len(sub)), "r": round4(r), "p_value": float(p),
+              "groups": {levels[0]: 0, levels[1]: 1}}
+    md = [
+        "## Point-biserial correlation\n",
+        f"We measured the association between the binary **{binv}** "
+        f"({levels[0]}=0, {levels[1]}=1) and continuous **{contv}** (n = {len(sub)}).\n",
+        f"r_pb = **{round4(r)}**, {pstr(p)} — a {_r_word(r)} association.",
+    ]
+    refs = citations.refs(["tate1954"])
+    return {"key": "point_biserial", "title": "Point-biserial correlation", "values": values,
+            "markdown": "\n".join(md) + refs_block(refs), "references": refs,
+            "figure_path": None, "assumptions": ["One binary and one continuous variable",
+                                                 "Approximately normal continuous variable per group"]}

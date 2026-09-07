@@ -95,7 +95,8 @@ def _validate_item(raw: dict, valid_cols: set[str]) -> EnginePlanItem | None:
     column_params = {"outcome", "group", "pre", "post", "var1", "var2", "predictor",
                      "rater1", "rater2", "method1", "method2", "time", "event",
                      "within", "condition", "subject", "covariate", "before", "after",
-                     "factor1", "factor2", "group1", "group2"}
+                     "factor1", "factor2", "group1", "group2", "binary", "continuous",
+                     "variable"}
     for k, v in params.items():
         if isinstance(v, str) and k in column_params and v not in valid_cols:
             return None

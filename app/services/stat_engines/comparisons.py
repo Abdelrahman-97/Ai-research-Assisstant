@@ -18,7 +18,7 @@ from scipy import stats
 from app.services import citations
 from app.services.stat_engines import plots
 from app.services.stat_engines.base import (
-    EngineError, describe, fmt_p, get_col, pstr, refs_block, round4,
+    EngineError, describe, fmt_p, get_col, numeric, pstr, refs_block, round4,
 )
 
 
@@ -107,6 +107,44 @@ def independent_ttest(df: pd.DataFrame, params: dict, fig_dir: str | Path | None
             "references": refs, "figure_path": fig,
             "assumptions": ["Independent observations", "Approximately normal outcome per group",
                             "Variance equality assessed by Levene's test"]}
+
+
+def one_sample_ttest(df: pd.DataFrame, params: dict, fig_dir: str | Path | None = None) -> dict:
+    outcome = params.get("outcome") or params.get("variable")
+    mu0 = params.get("popmean", params.get("reference"))
+    if mu0 is None:
+        raise EngineError("One-sample t-test needs a reference value ('popmean').")
+    try:
+        mu0 = float(mu0)
+    except (TypeError, ValueError):
+        raise EngineError("The reference value must be a number.")
+    s = numeric(get_col(df, outcome, "variable"), outcome)
+    if len(s) < 2:
+        raise EngineError("Need at least 2 values.")
+    t, p = stats.ttest_1samp(s, mu0)
+    n = len(s)
+    m, sd = s.mean(), s.std(ddof=1)
+    d = (m - mu0) / sd if sd else None
+    se = sd / math.sqrt(n)
+    tcrit = stats.t.ppf(0.975, n - 1)
+    ci = (m - tcrit * se, m + tcrit * se)
+    values = {"n": n, "mean": round4(m), "sd": round4(sd), "reference": mu0,
+              "mean_ci95": [round4(ci[0]), round4(ci[1])], "t": round4(t), "df": n - 1,
+              "p_value": float(p), "cohens_d": round4(d)}
+    md = [
+        "## One-sample t-test\n",
+        f"We tested whether the mean of **{outcome}** (M = {round4(m)}, SD = {round4(sd)}, "
+        f"n = {n}) differs from the reference value {mu0}.\n",
+        f"The mean was {round4(m)} (95% CI {round4(ci[0])} to {round4(ci[1])}); the difference "
+        f"from {mu0} was "
+        + ("statistically significant" if p < 0.05 else "not statistically significant")
+        + f", **t({n - 1}) = {round4(t)}**, {pstr(p)}, Cohen's d = **{round4(d)}**.",
+    ]
+    refs = citations.refs(["student1908", "cohen1988"])
+    return {"key": "one_sample_ttest", "title": "One-sample t-test", "values": values,
+            "markdown": "\n".join(md) + refs_block(refs), "references": refs,
+            "figure_path": None,
+            "assumptions": ["Independent observations", "Approximately normal outcome"]}
 
 
 def paired_ttest(df: pd.DataFrame, params: dict, fig_dir: str | Path | None = None) -> dict:

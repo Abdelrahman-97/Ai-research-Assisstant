@@ -66,6 +66,10 @@ _REFS: dict[str, str] = {
     "friedman1937": "Friedman, M. (1937). The use of ranks to avoid the assumption of normality implicit in the analysis of variance. Journal of the American Statistical Association, 32(200), 675–701.",
     "fisher1922": "Fisher, R. A. (1922). On the interpretation of χ² from contingency tables, and the calculation of P. Journal of the Royal Statistical Society, 85(1), 87–94.",
     "mcnemar1947": "McNemar, Q. (1947). Note on the sampling error of the difference between correlated proportions or percentages. Psychometrika, 12(2), 153–157.",
+    "mccullagh1989": "McCullagh, P., & Nelder, J. A. (1989). Generalized Linear Models (2nd ed.). Chapman & Hall/CRC.",
+    "hilbe2011": "Hilbe, J. M. (2011). Negative Binomial Regression (2nd ed.). Cambridge University Press.",
+    "mccullagh1980": "McCullagh, P. (1980). Regression models for ordinal data. Journal of the Royal Statistical Society: Series B, 42(2), 109–142.",
+    "tate1954": "Tate, R. F. (1954). Correlation between a discrete and a continuous variable. Point-biserial correlation. Annals of Mathematical Statistics, 25(3), 603–607.",
 
     # --- Diagnostic accuracy ---
     "altman1994": "Altman, D. G., & Bland, J. M. (1994). Diagnostic tests 1: sensitivity and specificity. BMJ, 308(6943), 1552.",
