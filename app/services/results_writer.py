@@ -86,6 +86,65 @@ _SYSTEM_AR = (
 )
 
 
+# --------------------------------------------------------------------------- #
+# Meta-analysis narrative (thesis/paper Results section from deterministic stats)
+# --------------------------------------------------------------------------- #
+_SCOPE_WORD = {"thesis": "thesis", "studies": "research paper"}
+
+_META_INSTRUCTIONS = """\
+Write the Results section of a {scope} reporting a meta-analysis, using ONLY the
+figures in the STATISTICAL OUTPUT below. Do NOT introduce any number, statistic,
+or citation that is not present there — every value you state must appear verbatim
+in the output.
+
+Requirements:
+- Write flowing academic prose in the past tense (not bullet points), at the
+  standard of a {scope}.
+- Cover, in a natural order: how many studies were pooled, on what effect measure,
+  and under which model (and τ² estimator / Hartung-Knapp if stated); the pooled
+  estimate with its 95% CI and p-value; heterogeneity (I², τ², Q) and what it
+  implies; the prediction interval if present; subgroup and/or meta-regression
+  findings if present; publication-bias / small-study checks if present; and the
+  leave-one-out sensitivity if present.
+- Refer the reader to the forest plot and the funnel plot where appropriate.
+- {language_rule}
+- Report p-values in APA style (e.g. "p < .001", otherwise "p = .032"). Round only
+  for presentation; never change or invent a value.
+- Output Markdown using a short heading and paragraphs only. Do NOT write a
+  References section — references are appended separately.
+
+STATISTICAL OUTPUT:
+---
+{facts}
+---
+"""
+
+
+def write_meta_narrative(
+    *,
+    facts: str,
+    scope: Scope,
+    language: str = "en",
+    client: LLMClient | None = None,
+) -> str:
+    """Turn the deterministic meta-analysis output into a thesis/paper Results
+    narrative. Grounded strictly in `facts` (the computed numbers); the caller
+    appends the exact tables/figures/references."""
+    client = client or LLMClient()
+    lang = language if language in _LANG_RULES else "en"
+    scope_word = _SCOPE_WORD.get(getattr(scope, "value", scope), "research paper")
+    prompt = _META_INSTRUCTIONS.format(
+        scope=scope_word, facts=facts[:6000], language_rule=_LANG_RULES[lang],
+    )
+    system = _SYSTEM_AR if lang == "ar" else _SYSTEM
+    return client.chat(
+        [
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt},
+        ]
+    )
+
+
 def _read_tables(artifacts: list[Artifact], max_chars: int = 4000) -> str:
     chunks: list[str] = []
     for art in artifacts:

@@ -28,6 +28,7 @@ from app.config import settings
 from app.models.schemas import (
     TOOL_TASKS,
     Artifact,
+    FormatSpec,
     Language,
     PriceQuote,
     Run,
@@ -128,6 +129,18 @@ def estimate_tool(run: Run, inputs: dict) -> Run:
     if run.task not in TOOL_TASKS:
         raise PipelineError("This job is not a tool job.")
     run.tool_inputs = inputs or {}
+    # Meta-analysis is written up as a thesis/paper Results section: capture the
+    # write-up scope, language, and reference/format style chosen by the user.
+    if run.task == TaskType.meta_analysis:
+        scope = (inputs or {}).get("scope")
+        if scope in ("thesis", "studies"):
+            run.scope = Scope(scope)
+        lang = (inputs or {}).get("output_language")
+        if lang in ("en", "ar"):
+            run.output_language = lang
+        preset = (inputs or {}).get("preset")
+        if preset in ("standard", "apa", "vancouver", "two_column"):
+            run.format_spec = FormatSpec(preset=preset)
     price = int(getattr(settings, _TOOL_PRICE[run.task]))
     customer = (
         pricing.gross_up_for_fees(price)
@@ -176,7 +189,6 @@ def compute_tool(run: Run) -> Run:
         return _touch(run)
 
     run.tool_result = result
-    markdown = tool_report.render(run.task.value, inp, result)
     fmt = formatting.resolve(run.format_spec)
     out_dir = Path(settings.data_dir) / "outputs"
     docx_path = out_dir / f"results_{run.id}.docx"
@@ -208,8 +220,28 @@ def compute_tool(run: Run) -> Run:
         except Exception:  # noqa: BLE001
             artifacts = []
 
-    report_writer.markdown_to_docx(markdown, artifacts, docx_path, fmt=fmt)
-    report_writer.markdown_to_pdf(markdown, artifacts, pdf_path, fmt=fmt)
+    # Build the report body. Meta-analysis is written up as a thesis/paper Results
+    # section: an AI narrative grounded strictly in the deterministic numbers,
+    # followed by the exact tables/figures/references. Everything else uses the
+    # explained tool report directly.
+    is_rtl = run.output_language == "ar"
+    if run.task == TaskType.meta_analysis:
+        facts = tool_report.render("meta_analysis", inp, result)  # ground-truth numbers
+        markdown = facts  # deterministic full report (also the safe fallback)
+        if settings.llm_api_key:  # only attempt the AI narrative when an LLM is configured
+            try:
+                narrative = results_writer.write_meta_narrative(
+                    facts=facts, scope=run.scope, language=run.output_language,
+                ).strip()
+                if narrative:
+                    markdown = narrative + "\n\n" + tool_report.meta_detail(inp, result)
+            except Exception:  # noqa: BLE001 - never fail a paid job on the writer (incl. LLMError)
+                markdown = facts
+    else:
+        markdown = tool_report.render(run.task.value, inp, result)
+
+    report_writer.markdown_to_docx(markdown, artifacts, docx_path, fmt=fmt, rtl=is_rtl)
+    report_writer.markdown_to_pdf(markdown, artifacts, pdf_path, fmt=fmt, rtl=is_rtl)
     run.docx_blob_id = blobs.put(run.id, kind="docx", filename=docx_path.name, content=docx_path.read_bytes())
     run.pdf_blob_id = blobs.put(run.id, kind="pdf", filename=pdf_path.name, content=pdf_path.read_bytes())
     run.results_markdown = markdown

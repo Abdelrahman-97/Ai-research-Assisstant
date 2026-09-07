@@ -237,10 +237,9 @@ async function renderDashboard() {
           <h1>${state.user && state.user.name ? "Welcome, " + esc(state.user.name.split(" ")[0]) : "Research workspace"}</h1>
           <p class="sub">Choose an analysis to begin.</p>
           <div class="feature-grid">
-            <button class="feature primary" id="fNew"><div class="f-ic">📝</div><div class="f-title">Results section</div><div class="f-desc">Upload data → AI plan → full write-up (Word/PDF)</div></button>
-            <button class="feature" data-tool="meta_analysis"><div class="f-ic">📊</div><div class="f-title">Meta-analysis</div><div class="f-desc">Pool studies · heterogeneity · bias · subgroups</div></button>
+            <button class="feature primary" id="fNew"><div class="f-ic">📝</div><div class="f-title">Results section</div><div class="f-desc">Upload data → AI plan → full write-up. Includes t-tests, ANOVA, regression, survival & diagnostic accuracy (ROC/AUC).</div></button>
+            <button class="feature" data-tool="meta_analysis"><div class="f-ic">📊</div><div class="f-title">Meta-analysis</div><div class="f-desc">Pool studies → thesis/paper Results write-up · forest & funnel plots</div></button>
             <button class="feature" data-tool="sample_size"><div class="f-ic">🔢</div><div class="f-title">Sample size</div><div class="f-desc">Power & sample-size for every common design</div></button>
-            <button class="feature" data-tool="diagnostic"><div class="f-ic">🩺</div><div class="f-title">Diagnostic accuracy</div><div class="f-desc">Sensitivity · specificity · PPV/NPV · LRs</div></button>
           </div>
         </div>
         <div class="card">
@@ -255,7 +254,6 @@ async function renderDashboard() {
           <button class="navlink active" id="navNew"><span class="ic">📝</span> Results section</button>
           <button class="navlink" data-tool="meta_analysis"><span class="ic">📊</span> Meta-analysis</button>
           <button class="navlink" data-tool="sample_size"><span class="ic">🔢</span> Sample size</button>
-          <button class="navlink" data-tool="diagnostic"><span class="ic">🩺</span> Diagnostic accuracy</button>
         </nav>
         <nav class="sidenav">
           <h4>More</h4>
@@ -412,9 +410,10 @@ function viewUpload() {
   return `
     <h2>Upload your study</h2>
     <p class="sub">We validate the data and use it to price the job — this step is free.</p>
+    <p class="muted-note">Handles descriptive stats, t-tests, ANOVA, correlation & regression, chi-square, survival analysis, and <strong>diagnostic accuracy (sensitivity, specificity, ROC/AUC)</strong> — just describe what you need below.</p>
     <label>Protocol / methods</label>
     <textarea id="protocol" placeholder="Paste the methods / analysis plan of your study..."></textarea>
-    <p class="muted-note">💡 Describe your design, groups, and the outcomes you want compared. The clearer this is, the better the AI's proposed analysis. Arabic is supported.</p>
+    <p class="muted-note">💡 Describe your design, groups, and the outcomes you want compared. For a diagnostic study, say which column is the test result and which is the true diagnosis (gold standard). The clearer this is, the better the AI's proposed analysis. Arabic is supported.</p>
     <label>Data file (Excel or CSV)</label>
     <input id="dataFile" type="file" accept=".xlsx,.xls,.csv,.tsv" />
     <p class="muted-note">💡 One row per participant, one column per variable, with a header row. Arabic column names are fine. Nothing is charged until you see and approve the price.</p>
@@ -709,9 +708,19 @@ function viewToolInput(task) {
   }
   // meta-analysis
   return `
-    <p class="sub">Pool results across studies. You'll get a full report: pooled effect (fixed + random), heterogeneity (I², τ²), subgroups, meta-regression, cumulative analysis, and publication-bias tests — with forest &amp; funnel plots, all cited.</p>
+    <p class="sub">Pool results across studies. You'll get a full <strong>Results section written for your thesis or paper</strong> — pooled effect (fixed + random), heterogeneity (I², τ²), subgroups, meta-regression, cumulative analysis, and publication-bias tests — with forest &amp; funnel plots, all cited, as Word &amp; PDF.</p>
 
-    <label>1 · Effect measure <span class="muted-note">— what each study reports</span></label>
+    <label>Write-up for</label>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:150px;"><label style="font-size:12px;">Document type</label>
+        <select id="mScope"><option value="thesis">Thesis chapter</option><option value="studies">Paper / study</option></select></div>
+      <div style="flex:1;min-width:150px;"><label style="font-size:12px;">Language</label>
+        <select id="mLang"><option value="en">English</option><option value="ar">العربية (Arabic)</option></select></div>
+      <div style="flex:1;min-width:150px;"><label style="font-size:12px;">Reference / format style</label>
+        <select id="mPreset"><option value="standard">Standard</option><option value="apa">APA</option><option value="vancouver">Vancouver</option><option value="two_column">Two-column</option></select></div>
+    </div>
+
+    <label style="margin-top:14px;">1 · Effect measure <span class="muted-note">— what each study reports</span></label>
     <select id="mMeasure">
       <option value="generic">Generic (effect + standard error)</option>
       <option value="or">Odds ratio (from 2×2 counts)</option>
@@ -862,7 +871,11 @@ function gatherToolInputs(task) {
            subgroups: document.getElementById("mSub").checked,
            meta_regression: document.getElementById("mReg").checked,
            cumulative: document.getElementById("mCum").checked,
-           bias_tests: true };
+           bias_tests: true,
+           // write-up options (thesis/paper Results-section narrative)
+           scope: document.getElementById("mScope").value,
+           output_language: document.getElementById("mLang").value,
+           preset: document.getElementById("mPreset").value };
 }
 
 /* Parse the advanced paste box into studies, using the current field layout. */

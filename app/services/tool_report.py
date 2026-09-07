@@ -111,7 +111,7 @@ def _diagnostic(inp: dict, r: dict) -> str:
     return "\n".join(md) + _refs_block(refs)
 
 
-def _meta(inp: dict, r: dict) -> str:
+def _meta(inp: dict, r: dict, *, include_summary: bool = True, title: str = "# Meta-analysis\n") -> str:
     label = r.get("scale_label", "effect")
     log = r.get("log_scale")
     het = r["heterogeneity"]
@@ -137,18 +137,21 @@ def _meta(inp: dict, r: dict) -> str:
     i2 = het["I2_percent"]
     het_word = "low" if i2 < 25 else "moderate" if i2 < 75 else "considerable"
 
-    md = [
-        "# Meta-analysis\n",
-        "## Summary\n",
-        f"We pooled **{r['k']} studies** on the **{label}** scale using a "
-        f"**{r['model']}-effects model**"
-        + (f" (between-study variance τ² estimated by {het['tau2_method']}"
-           + (", with the Hartung-Knapp adjustment)" if primary.get('method') == 'Hartung-Knapp' else ")")
-           if r['model'] == 'random' else "") + ". "
-        f"The pooled estimate was **{show(primary)}**, {_pstr(pval)} — indicating {direction}. "
-        f"Between-study heterogeneity was **{het_word}** (I² = {i2}%). "
-        "See the forest plot for the per-study effects and the pooled result, and the funnel plot for "
-        "a visual check of small-study effects.\n",
+    md = [title]
+    if include_summary:
+        md += [
+            "## Summary\n",
+            f"We pooled **{r['k']} studies** on the **{label}** scale using a "
+            f"**{r['model']}-effects model**"
+            + (f" (between-study variance τ² estimated by {het['tau2_method']}"
+               + (", with the Hartung-Knapp adjustment)" if primary.get('method') == 'Hartung-Knapp' else ")")
+               if r['model'] == 'random' else "") + ". "
+            f"The pooled estimate was **{show(primary)}**, {_pstr(pval)} — indicating {direction}. "
+            f"Between-study heterogeneity was **{het_word}** (I² = {i2}%). "
+            "See the forest plot for the per-study effects and the pooled result, and the funnel plot for "
+            "a visual check of small-study effects.\n",
+        ]
+    md += [
         "## Pooled effect\n",
         f"- **Random-effects estimate:** {show(r['random'])}, p = {_p(r['random'].get('p_value'))}"
         + (f" [{r['random'].get('method')} interval]" if r['random'].get('method') else ""),
@@ -248,3 +251,10 @@ def render(task: str, inputs: dict, result: dict) -> str:
     if task == "meta_analysis":
         return _meta(inputs, result)
     return "# Report\n\n(Unsupported tool.)"
+
+
+def meta_detail(inputs: dict, result: dict) -> str:
+    """The deterministic meta tables/figures/references WITHOUT the prose summary —
+    used as the factual appendix beneath an AI-written Results narrative."""
+    return _meta(inputs, result, include_summary=False,
+                 title="## Detailed statistical output\n")
